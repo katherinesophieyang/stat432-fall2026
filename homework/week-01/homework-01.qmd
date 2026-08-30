@@ -1,0 +1,420 @@
+---
+title: "Homework 01"
+pagetitle: "Homework 01"
+body-classes: "lecture-page practice-page"
+format:
+  html:
+    embed-resources: true
+    html-math-method: mathml
+    page-layout: full
+    toc: true
+    toc-location: body
+    toc-title: "On this page"
+    toc-depth: 2
+---
+
+## Question 1 (Least squares and matrix calculations)
+
+Set the random seed to 43201. Generate $n=100$ observations with $p=5$ predictors according to
+
+$$
+x_{ij}\overset{\mathrm{iid}}{\sim}N(0,1),
+\qquad
+\varepsilon_i\overset{\mathrm{iid}}{\sim}N(0,0.7^2),
+$$
+
+with all predictors and errors generated independently. Let
+
+$$
+\mathbf X
+=
+\begin{bmatrix}
+\mathbf 1 & \mathbf x_1 & \cdots & \mathbf x_5
+\end{bmatrix},
+\qquad
+\boldsymbol\beta
+=
+(3,1.4,-0.9,0.7,0,1.1)^{\mathsf T},
+$$
+
+and generate
+
+$$
+\mathbf y=\mathbf X\boldsymbol\beta+\boldsymbol\varepsilon.
+$$
+
+a. Generate the data and report the dimensions and rank of $\mathbf X$. Calculate the least-squares estimate $\widehat{\boldsymbol\beta}$ using a numerically stable least-squares routine, without explicitly calculating $(\mathbf X^{\mathsf T}\mathbf X)^{-1}$. Compare the estimates with the coefficients used to generate the data.
+```{r}
+set.seed(43201)
+n <- 100
+p <- 5
+x_pred <- matrix(rnorm(n*p), nrow = n, ncol = p)
+epsilon <- rnorm(n, mean = 0, sd = sqrt(0.7^2))
+X <- cbind(1, x_pred)
+beta <- c(3, 1.4, -0.9, 0.7, 0, 1.1)
+y <- X %*% beta + epsilon
+
+dim(X)
+qr(X)$rank
+
+beta_hat <- qr.solve(X, y)
+beta_hat
+
+data.frame(
+  True = beta,
+  Estimated = as.vector(beta_hat),
+  Difference = as.vector(beta_hat) - beta
+)
+```
+
+
+b. Calculate the fitted values, the residual vector $\mathbf r=\mathbf y-\mathbf X\widehat{\boldsymbol\beta}$, and the training root mean squared error
+
+$$
+\operatorname{RMSE}
+=
+\left(
+\frac{1}{n}\sum_{i=1}^{n}r_i^2
+\right)^{1/2}.
+$$
+
+```{r}
+y_hat <- X %*% beta_hat
+r <- y - y_hat
+
+RMSE <- sqrt(mean(r^2))
+RMSE
+```
+
+c. Report $\lVert\mathbf X^{\mathsf T}\mathbf r\rVert_\infty$. Explain why this value should be close to zero and what it tells us about the residual vector.
+
+```{r}
+inf_norm <- max(abs(t(X) %*% r))
+inf_norm
+```
+
+This value should be close to 0 because of the orthogonality condition in least squares regression. We want r, the residual vector, to be orthogonal to every column of X. So X^t * r should be close to 0. The infinity norm measures the maximum absolute value of the elements in the vector, so if it is close to 0, it indicates that the residuals are indeed orthogonal to the columns of X. It also indicates that the least squares coefficients have been estimated correctly, which minimize the total squared error.
+
+## Question 2 (Gaussian likelihood for linear regression)
+
+Continue with the data from Question 1. Suppose
+
+$$
+\mathbf Y\mid\mathbf X
+\sim
+N_n\left(\mathbf X\boldsymbol\beta,\sigma^2\mathbf I_n\right).
+$$
+
+The log-likelihood, including the constant term, is
+
+$$
+\ell(\boldsymbol\beta,\sigma^2)
+=
+-\frac{n}{2}\log(2\pi\sigma^2)
+-\frac{1}{2\sigma^2}
+(\mathbf y-\mathbf X\boldsymbol\beta)^{\mathsf T}
+(\mathbf y-\mathbf X\boldsymbol\beta).
+$$
+
+a. For fixed $\sigma^2$, explain why maximizing $\ell(\boldsymbol\beta,\sigma^2)$ over $\boldsymbol\beta$ is equivalent to minimizing the residual sum of squares. What does this imply about the maximum-likelihood estimate of $\boldsymbol\beta$?
+
+Since the error variance is fixed, looking at the first term of the equation, we can see it does not depend on beta. Therefore, it is just a constant. The second terms contains the residual sum of squares, so basically the log-likelihood is constant - (1/(2*sigma^2)) * RSS. Therefore, maximizing the log-likelihood is equivalent to minimizing the residual sum of squares. This implies that the maximum-likelihood estimate of beta is the same as the least-squares estimate of beta. So maximum likelihood and least squares provide the same coefficients that minimize the squared residuals in a normal linear regression model.
+
+b. For fixed $\boldsymbol\beta$, differentiate the log-likelihood with respect to $\sigma^2$ and derive its maximum-likelihood estimate. Calculate this estimate at $\widehat{\boldsymbol\beta}$ and compare it with the unbiased estimate of $\sigma^2$. Explain why the two denominators differ.
+
+``{r}
+r <- y - X %*% beta_hat
+
+RSS <- sum(r^2)
+
+sigma_MLE <- RSS / n
+
+sigma_unbiased <- RSS / (n - ncol(X))
+```
+
+The two denominators differ because the MLE does not take into account the degrees of freedom used to estimate regression coefficients, as it divides the RSS by the total number of observations. The unbiased estimate accounts for the intercept and five predictor coefficients, so 6 degrees of freedoms. So to find the unbiased estimator, we divide the RSS by the total number of observations subtracted by 6, in this case, indicating 94 degrees of freedom are left for estimating the error variance. 
+
+c. Let
+
+$$
+\mathbf e_{x_2}=(0,0,1,0,0,0)^{\mathsf T}.
+$$
+
+Using the variance estimate from part b, plot
+
+$$
+\ell\left(
+\widehat{\boldsymbol\beta}+t\mathbf e_{x_2},
+\widehat{\sigma}_{\mathrm{MLE}}^2
+\right)
+$$
+
+over a grid of $t$ values from $-1.25$ to $1.25$. State where the maximum occurs and explain why this agrees with the least-squares result.
+
+```{r}
+ex2 <- c(0, 0, 1, 0, 0, 0)
+
+t_grid <- seq(-1.25, 1.25, length.out = 200)
+
+log_likelihood <- function(t) {
+  
+  beta_t <- beta_hat + t * ex2
+ 
+  r_t <- y - X %*% beta_t
+
+  sigma_MLE <- sum((y - X %*% beta_hat)^2) / n
+  
+  -n/2 * log(2*pi*sigma_MLE) -
+    sum(r_t^2) / (2*sigma_MLE)
+}
+
+
+loglik_values <- sapply(t_grid, log_likelihood)
+
+plot(t_grid, loglik_values,
+     type = "l",
+     xlab = "t",
+     ylab = "Log-likelihood")
+
+abline(v = 0, lty = 2)
+```
+
+The maximum occurs at t=0, which corresponds to the least-squares estimate of beta. This agrees with the least-squares result because the maximum likelihood estimate of beta is the same as the least-squares estimate, as shown in part a. The log-likelihood is maximized when t=0, indicating that the least-squares estimate provides the best fit to the data under the normal linear regression model. Or in other words, minimizing the RSS is the same as maximizing the log-likelihood.
+
+## Question 3 (Starting values in nonconvex optimization)
+
+Consider the function
+
+$$
+f(x)=\exp(1.5x)-3(x+6)^2-0.05x^3,
+$$
+
+with derivative
+
+$$
+f'(x)=1.5\exp(1.5x)-6(x+6)-0.15x^2.
+$$
+
+a. Plot $f(x)$ over the interval $[-40,7]$. Based on the plot, describe the important features of the objective function that may affect numerical optimization.
+
+```{r}
+f <- function(x) {
+  exp(1.5*x) - 3*(x + 6)^2 - 0.05*x^3
+}
+
+curve(f(x), from = -40, to = 7,
+      xlab = "x",
+      ylab = "f(x)",
+      main = "Objective Function")
+```
+
+It seems the function has two local minima, with a maximum in between. The function is nonconvex, which means that depending on the starting point, the optimization algorithm may converge to different local minima. The steepness of the function in certain regions may also affect convergence, as well as the presence of flat regions where the gradient is small.
+
+b. Use BFGS to minimize $f(x)$ twice, starting at $x^{(0)}=-15$ and $x^{(0)}=0$. Supply $f'(x)$ to the optimizer. For each run, report the final value of $x$, the final objective value, $|f'(x)|$, and whether the optimizer reported convergence.
+
+```{r}
+f <- function(x) {
+  exp(1.5*x) - 3*(x + 6)^2 - 0.05*x^3
+}
+
+f_prime <- function(x) {
+  1.5*exp(1.5*x) - 6*(x + 6) - 0.15*x^2
+}
+result1 <- optim(
+  par = -15,
+  fn = f,
+  gr = f_prime,
+  method = "BFGS"
+)
+
+result1
+
+result2 <- optim(
+  par = 0,
+  fn = f,
+  gr = f_prime,
+  method = "BFGS"
+)
+
+result2
+```
+
+c. Explain why the two runs can converge to different answers. Which run gives the lower objective value? What additional evidence would be needed before claiming that this point is the global minimum?
+
+The two runs can converge to different answers because, since the function has multiple local minima, it is nonconvex. BFGS is a local optimization methods, therefore the starting value determines which local minimum the algorithm converges to. The run starting at x^(0)=-15 gives the lower objective value, so it seems like the better minimum. To claim that this point is the global minimum, however, we would need more evidence, such as trying various starting values and comparing the resulting minima.
+
+## Question 4 (Nearly collinear predictors)
+
+Continue with $\mathbf X$ and $\mathbf y$ from Question 1. Set the random seed to 43202 and generate
+
+$$
+u_i\overset{\mathrm{iid}}{\sim}N(0,1),
+\qquad i=1,\ldots,n.
+$$
+
+Define
+
+$$
+\mathbf x_6=\mathbf x_1+10^{-4}\mathbf u,
+\qquad
+\mathbf X_+
+=
+\begin{bmatrix}
+\mathbf X & \mathbf x_6
+\end{bmatrix},
+$$
+
+and let
+
+$$
+\mathbf y^\star=\mathbf y+10^{-3}\mathbf u.
+$$
+
+Use a numerically stable least-squares routine throughout.
+
+a. Fit $\mathbf y$ using $\mathbf X$ and $\mathbf X_+$. For each design matrix, report the condition number and training RMSE. For the augmented fit, also report the coefficients of $\mathbf x_1$ and $\mathbf x_6$.
+
+```{r}
+set.seed(43202)
+u <- rnorm(n)
+x1 <- x_pred[, 1]
+x6 <- x1 + 10^(-4) * u
+X_plus <- cbind(X, x6)
+
+beta_hat <- qr.solve(X, y)
+beta_plus <- qr.solve(X_plus, y)
+
+y_hat <- X %*% beta_hat
+y_hat_plus <- X_plus %*% beta_plus
+
+kappa_X <- kappa(X)
+kappa_X_plus <- kappa(X_plus)
+
+rmse_X <- sqrt(mean((y - y_hat)^2))
+rmse_X_plus <- sqrt(mean((y - y_hat_plus)^2))
+
+beta_plus[2]
+beta_plus[7]
+```
+
+b. Fit $\mathbf y^\star$ using $\mathbf X_+$. Report the changes in the coefficients of $\mathbf x_1$ and $\mathbf x_6$. Compare the two fitted-value vectors using their root mean squared difference and maximum absolute difference.
+
+```{r}
+y_star <- y + 10^(-3) * u
+beta_star <- qr.solve(X_plus, y_star)
+change_x1 <- beta_star[2] - beta_plus[2]
+change_x6 <- beta_star[7] - beta_plus[7]
+
+change_x1
+change_x6
+
+y_hat_star <- X_plus %*% beta_star
+
+rms_diff <- sqrt(mean((y_hat_star - y_hat_plus)^2))
+max_diff <- max(abs(y_hat_star - y_hat_plus))
+
+rms_diff
+max_diff
+```
+
+c. Use the identity
+
+$$
+\mathbf y^\star-\mathbf y
+=
+10(\mathbf x_6-\mathbf x_1)
+$$
+
+to explain why the fitted values change very little while the two coefficients change substantially. What does this example suggest about interpreting separate effects for nearly collinear predictors?
+
+Since x6 is almost the same as x1, the two predictors are almost collinear. A small change, therefore, can lead to large changes in their individual coefficients since the model has a hard time determining which predictor should have the same effect. But since the two predictors are so similar, these changes can offset each other and produce similar fitted values. This shows how separate coefficient estimates can be unreliable when predictors are almost collinear, even when the model's overall predictions are relatively stable.
+
+## Question 5 (Data preparation and summary statistics)
+
+The file `data/data-manipulation.csv` is a small constructed data table containing an observation identifier, a group label, two numeric predictors, and a response. Some response values are missing. For analyses involving the response, use only observations with a recorded response. Do not replace a missing response with zero or a group mean.
+
+a. Read the data and report its dimensions, column types, number of duplicated identifiers, and number of missing values in each column. Create an analysis table containing only observations with a recorded response, and define
+
+$$
+\texttt{feature\_sum}=\texttt{x1}+\texttt{x2}.
+$$
+
+```{r}
+library(dplyr)
+data.manipulation <- read.csv("C:/Users/kates/.vscode/stat432-fall2026/homework/week-01/data/data-manipulation.csv")
+View(data.manipulation)
+data <- data.manipulation
+
+dim(data)
+str(data)
+sum(duplicated(data$observation_id))
+colSums(is.na(data))
+
+analysis <- data %>%
+  filter(!is.na(response)) %>%
+  mutate(feature_sum = x1 + x2)
+```
+
+b. For each group, report the number of observations, the mean response, and the mean of `feature_sum`. State clearly which observations these summaries describe.
+
+```{r}
+group_summary <- analysis %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean_response = mean(response),
+    mean_feature_sum = mean(feature_sum)
+  )
+
+group_summary
+```
+
+c. Sort the analysis table by response from largest to smallest and report the first three rows, including `observation_id`, `group`, `response`, and `feature_sum`. Add code checks verifying that the number of retained rows equals the number of nonmissing responses in the original data, that the analysis table has no missing response values, and that its identifiers are unique.
+
+```{r}
+sorted_analysis <- analysis %>%
+  arrange(desc(response))
+
+sorted_analysis %>%
+  select(observation_id, group, response, feature_sum) %>%
+  slice_head(n = 3)
+
+nrow(analysis) == sum(!is.na(data$response))
+
+sum(is.na(analysis$response)) == 0
+
+!anyDuplicated(analysis$observation_id)
+```
+
+## Question 6 (Can 39 million Fitbit records represent US adults?)
+
+[Patten et al. (2026)](https://doi.org/10.1038/s41591-026-04352-3) describe Fitbit data from 59,018 participants in the All of Us Research Program. The dataset spans 14 years and contains more than 39 million daily step records. Participants contributed data through one of two routes:
+
+- Bring Your Own Device (BYOD): participants shared data from a Fitbit they already owned.
+- Wearables Enhancing All of Us Research (WEAR): invited participants received a Fitbit at no cost.
+
+In the general activity cohort, the BYOD and WEAR groups contained 32,035 and 22,474 participants, respectively. The BYOD value is listed first in each comparison below:
+
+- 77.3% versus 55.1% reported being White;
+- 6.1% versus 15.2% reported annual household income between $\$10{,}000$ and $\$25{,}000$; and
+- median daily steps were 6,867 versus 5,797.
+
+Suppose the target is the mean of the participant-specific average daily step counts among US adults during the study period, with each adult given equal weight. A researcher writes:
+
+> "This dataset contains more than 39 million daily Fitbit records. Therefore, the average of all recorded step counts should provide an accurate estimate of mean daily activity among US adults."
+
+a. Are the 39 million daily records independent observations? What characteristics or behaviors could cause some participants to contribute more recorded days than others? Explain how averaging all recorded days would then weight participants unequally.
+
+They are not independent observations since many of the records came from the same participants. One's activity level could affect how many days they contribute. For example, a more active person may be more likely to wear their Fitbit every day and therefore contribute more recorded days. Averaging all recorded days would then weight participants unequally, giving more weight to those who contributed more days, which could bias the estimate of mean daily activity among US adults. 
+
+b. BYOD participants reported a median of 6,867 daily steps, compared with 5,797 among WEAR participants. Does this comparison show that already owning a Fitbit causes people to walk more? Explain your answer and give at least one plausible alternative explanation based on how participants entered the two groups.
+
+No it does not show that already owning a Fitbit causes people to walk more. BYOD participants already owned one and chose to share data, while WEAR participants were invited and received a Fitbit. So the groups could differ in other characteristics that affect their activity levels, such as socioeconomic status, health consciousness, or motivation to participate in research. For example, BYOD participants may be more health-conscious or have higher incomes, which could lead to higher activity levels independent of Fitbit ownership. Therefore, observed differences are associations, not indicative of causality.
+
+c. A very large dataset can still produce a biased estimate of a population quantity when the people and observations entering the dataset are selected. Using this study, explain how selection of both participants and recorded days could make the observed data differ from the US adult population. Why might the naive average of all recorded daily step counts fail to estimate the stated target? You do not need to determine the direction of the bias.
+
+This is because participant selection can create differences between the study sample and the target population. For example, participants who choose to share their Fitbit data may differ from the general US adult population in terms of demographics, health behaviors, or socioeconomic status. Recorded days can also create differences because participants did not contribute the same number of days, and the days that got recorded had to depend on whether someone uses or wears their device. So some participants and some days may have more influence on the dataset. The naive average of all recorded daily step counts does not give each US adult equal weight, and therefore it may not accurately reflect the mean daily activity of the entire US adult population. So while a very large number of observations can reduce random error, it does not mean that the estimate is unbiased/get rid of selection bias.
+
+### Source
+
+Patten, T., Preble, E. A., Master, H., et al. (2026). [The All of Us Research Program's wearables dataset](https://doi.org/10.1038/s41591-026-04352-3). *Nature Medicine*, 32, 2302-2310.
