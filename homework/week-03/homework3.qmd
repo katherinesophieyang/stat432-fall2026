@@ -1,0 +1,952 @@
+---
+title: "Homework 03"
+pagetitle: "Homework 03"
+body-classes: "lecture-page practice-page"
+format:
+  html:
+    embed-resources: true
+    html-math-method: mathml
+    page-layout: full
+    toc: true
+    toc-location: body
+    toc-title: "On this page"
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show the workflow"
+---
+
+## Question 1: Build an `explain-to-me` skill
+
+Create a small skill named `explain-to-me` that helps you understand a homework question.
+
+1. Design your `SKILL.md` file so that, when you explicitly ask your agent to use the skill to read a homework question, the agent communicates with you and explains what the question is asking.
+
+2. Keep the skill file short. It should contain a few useful rules, instructions, and a clear statement of your intent. For example, you may ask the agent to explain the goal of the question, clarify what work is required, and point you to an appropriate section of the Week 3 lectures: [Ridge Regression: Stability Through Shrinkage](https://teazrq.github.io/stat432rpy/topics/ridge-regression/ridge-regression.html) or [From a Penalized Objective to a Fitted Ridge Model](https://teazrq.github.io/stat432rpy/topics/ridge-regression/optimization-and-cross-validation.html). The skill should help you understand the question without completing the solution for you.
+
+3. Create the skill yourself or with the help of AI. Save it as `explain-to-me/SKILL.md`. Then ask your AI agent to install the skill using its normal skill-installation method. Test it by explicitly asking the agent to use `explain-to-me` to read and explain Question 2.
+
+4. If the skill does not work well, or if it begins to disturb your usual workflow, ask your agent to remove the installed skill. You may revise and reinstall it if you wish.
+
+5. In all cases, append the complete contents of your developed `explain-to-me/SKILL.md` file at the end of your Homework 3 submission under the heading **`explain-to-me` skill**.
+```markdown
+---
+name: explain-to-me
+description: Explain a homework question without solving it.
+---
+
+# Intent
+Help the student understand what a homework question is asking so they can solve it themselves.
+
+# Instructions
+- First restate the goal of the question in simple, student-friendly language.
+- Break the prompt into the specific tasks the student needs to do; explain what each part is asking and what kind of answer/work it expects.
+- Point to the most relevant Week 3 lecture section when appropriate, especially [Ridge Regression: Stability Through Shrinkage](https://teazrq.github.io/stat432rpy/topics/ridge-regression/ridge-regression.html) or [From a Penalized Objective to a Fitted Ridge Model](https://teazrq.github.io/stat432rpy/topics/ridge-regression/optimization-and-cross-validation.html).
+- Explain key terms or notation needed to understand the question, but do not calculate the answer, give the final result, or complete the homework.
+- Communicate with the student: check whether the interpretation makes sense and invite them to try the first step.
+```
+
+
+## Question 2: Ridge regression with nearly collinear predictors
+
+Let $n=100$. Generate mutually independent standard normal random variables
+
+$$
+L_i, U_{i1}, U_{i2}, X_{i3}, X_{i4},
+\qquad i=1,\ldots,n,
+$$
+
+and define
+
+$$
+X_{i1}=L_i+0.04U_{i1},
+\qquad
+X_{i2}=L_i+0.04U_{i2}.
+$$
+
+Center and standardize each column of $\mathbf X$ to have mean zero and average squared value one, following the [lecture's scaling convention](https://teazrq.github.io/stat432rpy/topics/ridge-regression/ridge-regression.html#put-every-covariate-on-a-common-scale).
+
+Continue to use $\mathbf X\in\mathbb R^{n\times p}$ for the standardized matrix and keep it fixed throughout the question, where $p=4$ is the number of predictors. The unpenalized intercept gives $p+1=5$ total fitted coefficients. Let
+
+$$
+\boldsymbol\beta
+=
+(1.5,1.5,1,0)^{\mathsf T},
+\qquad
+\boldsymbol\mu
+=
+\mathbf X\boldsymbol\beta.
+$$
+
+Generate a training response and an independent test response at the same predictor values:
+
+$$
+\begin{aligned}
+\mathbf y
+&=
+\boldsymbol\mu+\boldsymbol\epsilon,\\
+\mathbf y^*
+&=
+\boldsymbol\mu+\boldsymbol\epsilon^*,
+\end{aligned}
+$$
+
+where
+
+$$
+\boldsymbol\epsilon,
+\boldsymbol\epsilon^*
+\overset{\mathrm{ind}}{\sim}
+\mathcal N_n(\mathbf0,\mathbf I_n).
+$$
+
+Center the training response as $\widetilde{\mathbf y}=\mathbf y-\bar y\mathbf1_n$. For each $\lambda\in\{0,0.02,0.2\}$, fit the slopes using the lecture's ridge formula:
+
+$$
+\widehat{\boldsymbol\beta}_\lambda
+=
+\left(\mathbf X^{\mathsf T}\mathbf X+n\lambda\mathbf I_p\right)^{-1}
+\mathbf X^{\mathsf T}\widetilde{\mathbf y}.
+$$
+
+The unpenalized intercept is $\widehat\beta_0=\bar y$; add this training mean back when predicting either response. The case $\lambda=0$ is ordinary least squares. Use seed `43231` before generating the design and responses. R and Python use different random-number generators, so their exact numerical results need not agree.
+
+a. Generate $\mathbf X$ once. Report the correlation between its first two columns and its largest and smallest singular values. Use these quantities to explain why the estimator contrast $\widehat\beta_1-\widehat\beta_2$ should be much more variable than $\widehat\beta_1+\widehat\beta_2$.
+
+```{r}
+set.seed(43231)
+
+n <- 100
+p <- 4
+
+# Generate independent standard normal variables
+L <- rnorm(n)
+U1 <- rnorm(n)
+U2 <- rnorm(n)
+X3 <- rnorm(n)
+X4 <- rnorm(n)
+
+# Construct the predictors
+X1 <- L + 0.04 * U1
+X2 <- L + 0.04 * U2
+
+# Put predictors into a matrix
+X <- cbind(X1, X2, X3, X4)
+
+# Center and standardize each column
+X <- scale(X, center = TRUE, scale = FALSE)
+X <- sweep(X, 2, sqrt(colMeans(X^2)), FUN = "/")
+
+# Correlation between first two columns
+cor12 <- cor(X[, 1], X[, 2])
+
+# Singular values
+singular_values <- svd(X)$d
+largest_sv <- max(singular_values)
+smallest_sv <- min(singular_values)
+
+cor12
+largest_sv
+smallest_sv
+singular_values
+```
+
+The estimator contrast should be more variable than the sum because the first two predictors are nearly collinear, leading to instability in estimating their individual effects. The high correlation between $X_1$ and $X_2$ means that small changes in the data can lead to large changes in the estimates of $\widehat\beta_1$ and $\widehat\beta_2$, especially in their difference. In contrast, the sum $\widehat\beta_1 + \widehat\beta_2$ is less sensitive to these variations, as it captures the combined effect of both predictors.
+
+b. Independently repeat the generation of $\mathbf y$ and $\mathbf y^*$, followed by all three fits, 200 times while keeping $\mathbf X$ fixed. Draw the training and test noise inside each repetition, then reuse that realized pair for all three values of $\lambda$. For each value of $\lambda$, report the empirical mean and standard deviation of
+
+$$
+\widehat\beta_1,
+\quad
+\widehat\beta_2,
+\quad
+\widehat\beta_1+\widehat\beta_2,
+\quad
+\widehat\beta_1-\widehat\beta_2.
+$$
+
+Also report the average training MSE and the average test MSE calculated from the independent test response, where
+
+$$
+\operatorname{MSE}_{\mathrm{test}}
+=
+\frac{1}{n}
+\left\lVert
+\mathbf y^*
+-
+\widehat\beta_0\mathbf1_n
+-
+\mathbf X\widehat{\boldsymbol\beta}
+\right\rVert_2^2.
+$$
+
+```{r}
+set.seed(43231)
+
+n <- 100
+p <- 4
+
+# -------------------------
+# Generate X once
+# -------------------------
+
+L <- rnorm(n)
+U1 <- rnorm(n)
+U2 <- rnorm(n)
+X3 <- rnorm(n)
+X4 <- rnorm(n)
+
+X1 <- L + 0.04 * U1
+X2 <- L + 0.04 * U2
+
+X <- cbind(X1, X2, X3, X4)
+
+# Center and standardize using lecture convention
+X <- scale(X, center = TRUE, scale = FALSE)
+X <- sweep(X, 2, sqrt(colMeans(X^2)), FUN = "/")
+
+# True coefficient vector
+beta <- c(1.5, 1.5, 1, 0)
+
+# True mean response
+mu <- as.vector(X %*% beta)
+
+# Values of lambda
+lambdas <- c(0, 0.02, 0.2)
+
+# -------------------------
+# Storage for results
+# -------------------------
+
+results <- data.frame()
+
+# -------------------------
+# 200 repetitions
+# -------------------------
+
+for (rep in 1:200) {
+
+  # Generate new training and test noise
+  eps <- rnorm(n)
+  eps_star <- rnorm(n)
+
+  # Training and independent test responses
+  y <- mu + eps
+  y_star <- mu + eps_star
+
+  # Center training response
+  y_bar <- mean(y)
+  y_tilde <- y - y_bar
+
+  # Fit all three models using the same y and y_star
+  for (lambda in lambdas) {
+
+    # Ridge coefficient estimate
+    beta_hat <- solve(
+      t(X) %*% X + n * lambda * diag(p),
+      t(X) %*% y_tilde
+    )
+
+    # Intercept
+    beta0_hat <- y_bar
+
+    # Predictions
+    y_hat <- beta0_hat + X %*% beta_hat
+
+    # Training MSE
+    train_mse <- mean((y - y_hat)^2)
+
+    # Test MSE
+    test_mse <- mean((y_star - y_hat)^2)
+
+    # Store results
+    results <- rbind(
+      results,
+      data.frame(
+        rep = rep,
+        lambda = lambda,
+        beta1 = beta_hat[1],
+        beta2 = beta_hat[2],
+        beta3 = beta_hat[3],
+        beta4 = beta_hat[4],
+        sum = beta_hat[1] + beta_hat[2],
+        difference = beta_hat[1] - beta_hat[2],
+        train_mse = train_mse,
+        test_mse = test_mse
+      )
+    )
+  }
+}
+library(dplyr)
+
+coef_summary <- results %>%
+  group_by(lambda) %>%
+  summarise(
+    beta1_mean = mean(beta1),
+    beta1_sd = sd(beta1),
+
+    beta2_mean = mean(beta2),
+    beta2_sd = sd(beta2),
+
+    sum_mean = mean(sum),
+    sum_sd = sd(sum),
+
+    difference_mean = mean(difference),
+    difference_sd = sd(difference)
+  )
+
+coef_summary
+
+mse_summary <- results %>%
+  group_by(lambda) %>%
+  summarise(
+    average_training_MSE = mean(train_mse),
+    average_test_MSE = mean(test_mse)
+  )
+
+mse_summary
+```
+
+c. Interpret the coefficient estimates and test MSE using bias and variance. Explain why ridge can substantially stabilize the individual coefficients without producing an equally large change in the fitted values.
+
+The nearly collinear predictors make the individual OLS coefficient estimates highly variable, especially their difference. Ridge regression reduces this variance by shrinking the coefficients, with a larger penalty producing greater stability. This comes at the cost of increased bias because the coefficients are pulled toward zero. A small ridge penalty can therefore improve test prediction by reducing variance more than it increases bias, while a larger penalty can introduce too much bias. The fitted values are less sensitive to the individual coefficients because \(X_1\) and \(X_2\) are nearly identical. Consequently, large changes in the individual coefficients, particularly in their difference, can produce relatively small changes in the fitted values.
+
+## Question 3: What does ridge regression shrink?
+
+Let $\mathbf X\in\mathbb R^{n\times p}$ be a centered predictor matrix, and let $\widetilde{\mathbf y}\in\mathbb R^n$ be the centered response. Use the supplied predictor scales for this algebraic question; the columns need not have unit variance. Here $p$ counts predictors, $\boldsymbol\beta\in\mathbb R^p$ contains their slopes, and $p+1$ counts all fitted coefficients, including the separately fitted, unpenalized intercept. Ridge regression minimizes
+
+$$
+L_\lambda(\boldsymbol\beta)
+=
+\frac{1}{2n}
+\left\lVert
+\widetilde{\mathbf y}-\mathbf X\boldsymbol\beta
+\right\rVert_2^2
++
+\frac{\lambda}{2}
+\lVert\boldsymbol\beta\rVert_2^2.
+$$
+
+a. Derive the ridge normal equation
+
+$$
+\left(
+\mathbf X^{\mathsf T}\mathbf X
++n\lambda\mathbf I_p
+\right)
+\widehat{\boldsymbol\beta}_\lambda
+=
+\mathbf X^{\mathsf T}\widetilde{\mathbf y}.
+$$
+
+Explain why it has a unique solution whenever $\lambda>0$, even if $\mathbf X$ is rank deficient or $p>n$.
+
+After deriving it, note that the matrix \(\mathbf X^{\mathsf T}\mathbf X + n\lambda\mathbf I_p\) is positive definite for any \(\lambda > 0\). This is because \(\mathbf X^{\mathsf T}\mathbf X\) is positive semi-definite, and adding \(n\lambda\mathbf I_p\) (which is positive definite) ensures that the sum is strictly positive definite. Therefore, the normal equation has a unique solution for \(\widehat{\boldsymbol\beta}_\lambda\) regardless of whether \(\mathbf X\) is rank deficient or if \(p > n\).
+
+b. Let
+
+$$
+\mathbf X
+=
+\mathbf U_r\mathbf D_r\mathbf V_r^{\mathsf T}
+$$
+
+be a compact singular value decomposition, where $r=\operatorname{rank}(\mathbf X)$, $\mathbf U_r\in\mathbb R^{n\times r}$, $\mathbf D_r\in\mathbb R^{r\times r}$, and $\mathbf V_r\in\mathbb R^{p\times r}$. Show that ridge multiplies the fitted response component in the $j$th left singular-vector direction, for $j=1,\ldots,r$, by
+
+$$
+\rho_j(\lambda)
+=
+\frac{d_j^2}{d_j^2+n\lambda}.
+$$
+
+Suppose $n=100$, $\lambda=0.01$, and the nonzero singular values are
+
+$$
+d_1=10,
+\qquad
+d_2=2,
+\qquad
+d_3=0.2.
+$$
+
+Calculate the three shrinkage factors and the total effective degrees of freedom, including the unpenalized intercept:
+
+$$
+\operatorname{df}_{\mathrm{eff}}(\lambda)
+=
+1+\sum_{j=1}^3\rho_j(\lambda).
+$$
+
+```{r}
+# Given values
+n <- 100
+lambda <- 0.01
+
+d <- c(10, 2, 0.2)
+
+# Shrinkage factors
+rho <- d^2 / (d^2 + n * lambda)
+
+rho
+
+# Effective degrees of freedom
+df_eff <- 1 + sum(rho)
+
+df_eff
+```
+
+c. Which direction receives the strongest shrinkage? Explain why shrinking this direction can reduce prediction variance. Under what circumstance could the same shrinkage produce substantial prediction bias?
+
+The strongest shrinkage is the d2 = 0.2 direction, as it has the smallest singular value. Shrinking this direction reduces prediction variance because it corresponds to a direction in the predictor space where the data provides little information (low variance), making the estimates in that direction highly variable. By shrinking it, we stabilize the predictions
+
+## Question 4: Ridge regression and optimization
+
+Let $\mathbf X\in\mathbb R^{n\times p}$ be a centered predictor matrix with $p=2$. Its columns need not have unit variance in this question. The intercept is fitted separately and is not penalized. Suppose the two eigenvalues of
+
+$$
+\mathbf A_0
+=
+\frac{1}{n}\mathbf X^{\mathsf T}\mathbf X
+$$
+
+are $9$ and $0.01$. Ridge regression with $\lambda=0.09$ has curvature matrix
+
+$$
+\mathbf A_\lambda
+=
+\frac{1}{n}\mathbf X^{\mathsf T}\mathbf X
++
+\lambda\mathbf I_p.
+$$
+
+a. Calculate the condition numbers of $\mathbf A_0$ and $\mathbf A_\lambda$. Explain what the change says about the geometry of the ridge objective.
+
+```{r}
+eigenvalues_A0 <- c(9, 0.01)
+
+# Ridge penalty
+lambda <- 0.09
+
+# Eigenvalues after adding ridge penalty
+eigenvalues_Alambda <- eigenvalues_A0 + lambda
+
+# Condition numbers
+condition_A0 <- max(eigenvalues_A0) / min(eigenvalues_A0)
+condition_Alambda <- max(eigenvalues_Alambda) / min(eigenvalues_Alambda)
+
+condition_A0
+condition_Alambda
+```
+
+What the changes say about the geometry of the ridge objective is that the addition of the ridge penalty improves the condition number, making the optimization landscape more well-behaved. A lower condition number indicates that the contours of the objective function are more circular (less elongated), which generally leads to better convergence properties for optimization algorithms like gradient descent.
+
+b. Gradient descent uses
+
+$$
+\boldsymbol\beta^{(k+1)}
+=
+\boldsymbol\beta^{(k)}
+-
+\eta\nabla L_\lambda\!\left(\boldsymbol\beta^{(k)}\right).
+$$
+
+Let $\widehat{\boldsymbol\beta}_\lambda$ be the ridge minimizer and define the optimization error
+
+$$
+\mathbf e^{(k)}
+=
+\boldsymbol\beta^{(k)}
+-
+\widehat{\boldsymbol\beta}_\lambda.
+$$
+
+Show that the component of $\mathbf e^{(k)}$ in an eigendirection with unpenalized eigenvalue $a$ is multiplied at each step by
+
+$$
+1-\eta(a+\lambda).
+$$
+
+Let $M=9.09$, the largest eigenvalue of $\mathbf A_\lambda$. Find the interval of step sizes that contracts every eigendirection. Then compare these two choices:
+
+- For $\eta=1/M$, calculate the two contraction factors and explain which direction converges faster.
+- For $\eta=2.1/M$, determine whether the method converges. Assume the initial error has a nonzero component in the eigendirection corresponding to $M$.
+
+```{r}
+# Largest eigenvalue
+M <- 9.09
+
+# Step size 1/M
+eta1 <- 1 / M
+
+contraction_large <- 1 - eta1 * 9.09
+contraction_small <- 1 - eta1 * 0.10
+
+contraction_large
+contraction_small
+
+# Step size 2.1/M
+eta2 <- 2.1 / M
+
+contraction_M <- 1 - eta2 * M
+
+contraction_M
+abs(contraction_M)
+```
+
+
+c. Increasing $\lambda$ generally improves the condition number. Explain why choosing $\lambda$ to make gradient descent converge as quickly as possible is not a valid statistical tuning rule.
+
+It is not a valid statistical tuning rule because choosing $\lambda$ solely based on optimization convergence does not consider the bias-variance trade-off in statistical modeling. A larger $\lambda$ may lead to faster convergence but can also introduce significant bias into the model, resulting in poor predictive performance. The goal of tuning $\lambda$ should be to minimize prediction error on unseen data, not just to optimize the speed of convergence.
+
+## Question 5: Selecting the ridge penalty for real-estate prediction
+
+The supplied `data/realestate.csv` contains 414 real-estate transactions from Sindian District, New Taipei City, Taiwan. The quantitative response `price` is the unit house price. The six predictors are the transaction date, house age, distance to the nearest mass rapid transit station, number of nearby convenience stores, latitude, and longitude. Treat all six predictors as quantitative in this question. The column `row_id` identifies an observation and must not be used as a predictor.
+
+The file `data/realestate-split-folds.csv` assigns 332 observations to the training set and 82 observations to the final test set. It also gives ten fold labels for the training observations. Match the two files using `row_id` and do not use the test responses while selecting a model.
+
+Use the penalty grid
+
+$$
+\Lambda
+=
+\{0\}
+\mathbin{\cup}
+\left\{
+10^{-4+0.05l}:l=0,\ldots,120
+\right\}.
+$$
+
+For every fit, center and standardize each predictor using only the observations available to that fit, with the variance divided by the number of fitting observations. Center the response and leave the intercept unpenalized.
+
+a. Perform ten-fold cross-validation over $\Lambda$ using the supplied training folds. Estimate the predictor means and scales separately within each set of nine training folds. For each $\lambda$, calculate the mean validation MSE and $\operatorname{SE}(\lambda)$, the sample standard deviation of the ten fold errors divided by $\sqrt{10}$. Use this SE for the conventional one-standard-error heuristic. Plot the mean validation MSE and identify $\lambda_{\min}$. Choose $\lambda_{\mathrm{1se}}$ as the largest candidate in $\Lambda$, including OLS, satisfying
+
+$$
+\overline{\operatorname{MSE}}(\lambda)
+\leq
+\overline{\operatorname{MSE}}(\lambda_{\min})
++
+\operatorname{SE}(\lambda_{\min}).
+$$
+
+```{r}
+library(tidyverse)
+realestate <- read.csv("C:/Users/kates/.vscode/stat432-fall2026/homework/week-03/data/realestate.csv")
+split_folds <- read_csv("C:/Users/kates/.vscode/stat432-fall2026/homework/week-03/data/realestate-split-folds.csv")
+
+data <- realestate %>%
+  inner_join(split_folds, by = "row_id")
+dim(data)
+
+
+train <- data %>%
+  filter(split == "train")
+
+test <- data %>%
+  filter(split == "test")
+
+
+# Number of observations
+n_train <- nrow(train)
+n_test <- nrow(test)
+
+n_train
+n_test
+
+predictor_names <- c(
+  "date",
+  "age",
+  "distance",
+  "stores",
+  "latitude",
+  "longitude"
+)
+
+response_name <- "price"
+
+X_train <- as.matrix(train[, predictor_names])
+y_train <- train[[response_name]]
+
+X_test <- as.matrix(test[, predictor_names])
+y_test <- test[[response_name]]
+
+lambda_grid <- c(
+  0,
+  10^(-4) + 0.05 * (0:120)
+)
+
+length(lambda_grid)
+lambda_grid
+
+standardize_data <- function(X, means = NULL, scales = NULL) {
+
+  if (is.null(means)) {
+    means <- colMeans(X)
+  }
+
+  if (is.null(scales)) {
+    scales <- sqrt(colMeans((sweep(X, 2, means, "-"))^2))
+  }
+
+  X_standardized <- sweep(X, 2, means, "-")
+  X_standardized <- sweep(X_standardized, 2, scales, "/")
+
+  list(
+    X = X_standardized,
+    means = means,
+    scales = scales
+  )
+}
+
+fit_ridge <- function(X, y, X_new, lambda) {
+
+  n <- nrow(X)
+  p <- ncol(X)
+
+  # Center response
+  y_mean <- mean(y)
+  y_centered <- y - y_mean
+
+  # Ridge estimate
+  beta_hat <- solve(
+    t(X) %*% X + n * lambda * diag(p),
+    t(X) %*% y_centered
+  )
+
+  # Intercept
+  beta0_hat <- y_mean
+
+  # Predictions
+  y_hat <- as.vector(
+    beta0_hat + X_new %*% beta_hat
+  )
+
+  list(
+    beta = beta_hat,
+    intercept = beta0_hat,
+    predictions = y_hat
+  )
+}
+
+# ------------------------------------------------------------
+# 10-fold cross-validation
+# ------------------------------------------------------------
+
+folds <- sort(unique(train$fold))
+
+# Store one validation MSE for every fold and lambda
+cv_results <- expand_grid(
+  fold = folds,
+  lambda = lambda_grid
+) %>%
+  mutate(validation_mse = NA_real_)
+
+for (f in folds) {
+
+  # Nine folds used for fitting
+  train_fold <- train %>%
+    filter(fold != f)
+
+  # One fold used for validation
+  validation_fold <- train %>%
+    filter(fold == f)
+
+  # Predictor matrices
+  X_fit <- as.matrix(train_fold[, predictor_names])
+  X_validation <- as.matrix(validation_fold[, predictor_names])
+
+  y_fit <- train_fold[[response_name]]
+  y_validation <- validation_fold[[response_name]]
+
+  # ----------------------------------------------------------
+  # Standardize using ONLY the nine fitting folds
+  # ----------------------------------------------------------
+
+  scaling <- standardize_data(X_fit)
+
+  X_fit_scaled <- scaling$X
+
+  X_validation_scaled <- sweep(
+    X_validation,
+    2,
+    scaling$means,
+    "-"
+  )
+
+  X_validation_scaled <- sweep(
+    X_validation_scaled,
+    2,
+    scaling$scales,
+    "/"
+  )
+
+  # ----------------------------------------------------------
+  # Fit every lambda
+  # ----------------------------------------------------------
+
+  for (lambda_value in lambda_grid) {
+
+    fit <- fit_ridge(
+      X = X_fit_scaled,
+      y = y_fit,
+      X_new = X_validation_scaled,
+      lambda = lambda_value
+    )
+
+    validation_mse <- mean(
+      (y_validation - fit$predictions)^2
+    )
+
+    cv_results$validation_mse[
+      cv_results$fold == f &
+        cv_results$lambda == lambda_value
+    ] <- validation_mse
+  }
+}
+
+cv_summary <- cv_results %>%
+  group_by(lambda) %>%
+  summarise(
+    mean_mse = mean(validation_mse),
+    sd_mse = sd(validation_mse),
+    se = sd_mse / sqrt(10),
+    .groups = "drop"
+  )
+
+lambda_min <- cv_summary$lambda[
+  which.min(cv_summary$mean_mse)
+]
+
+lambda_min
+
+mse_min <- min(cv_summary$mean_mse)
+
+se_min <- cv_summary$se[
+  which.min(cv_summary$mean_mse)
+]
+
+mse_min
+se_min
+
+threshold_1se <- mse_min + se_min
+
+lambda_1se <- max(
+  cv_summary$lambda[
+    cv_summary$mean_mse <= threshold_1se
+  ]
+)
+
+lambda_1se
+threshold_1se
+
+ggplot(cv_summary, aes(x = lambda, y = mean_mse)) +
+  geom_line() +
+  geom_point() +
+  geom_vline(
+    xintercept = lambda_min,
+    linetype = "dashed"
+  ) +
+  geom_vline(
+    xintercept = lambda_1se,
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "Ten-Fold Cross-Validation",
+    x = "Lambda",
+    y = "Mean Validation MSE"
+  ) +
+  theme_minimal()
+```
+
+
+b. Use all $n=332$ training observations to calculate the [lecture's GCV criterion](https://teazrq.github.io/stat432rpy/topics/ridge-regression/optimization-and-cross-validation.html#loocv-and-gcv) for each $\lambda\in\Lambda$:
+
+$$
+\operatorname{GCV}(\lambda)
+=
+\frac{
+\operatorname{MSE}_{\mathrm{train}}(\lambda)
+}{
+\left\{
+1-\operatorname{df}_{\mathrm{eff}}(\lambda)/n
+\right\}^2
+}.
+$$
+
+Here $\operatorname{MSE}_{\mathrm{train}}$ is the training MSE, and $\operatorname{df}_{\mathrm{eff}}$ includes the unpenalized intercept, as in Question 3. Estimate means and scales once from all training observations and keep them fixed for this calculation. Plot the GCV curve and identify $\lambda_{\mathrm{GCV}}$.
+
+```{r}
+scaling_all <- standardize_data(X_train)
+
+X_train_scaled <- scaling_all$X
+
+# ------------------------------------------------------------
+# GCV
+# ------------------------------------------------------------
+
+n <- nrow(X_train_scaled)
+
+# Singular values of standardized training X
+singular_values <- svd(X_train_scaled)$d
+
+gcv_results <- data.frame(
+  lambda = lambda_grid,
+  train_mse = NA_real_,
+  df_eff = NA_real_,
+  gcv = NA_real_
+)
+
+for (i in seq_along(lambda_grid)) {
+
+  lambda_value <- lambda_grid[i]
+
+  # Fit model
+  fit <- fit_ridge(
+    X = X_train_scaled,
+    y = y_train,
+    X_new = X_train_scaled,
+    lambda = lambda_value
+  )
+
+  # Training MSE
+  train_mse <- mean(
+    (y_train - fit$predictions)^2
+  )
+
+  # Effective degrees of freedom
+  df_eff <- 1 + sum(
+    singular_values^2 /
+      (singular_values^2 + n * lambda_value)
+  )
+
+  # GCV
+  gcv <- train_mse /
+    (1 - df_eff / n)^2
+
+  gcv_results$train_mse[i] <- train_mse
+  gcv_results$df_eff[i] <- df_eff
+  gcv_results$gcv[i] <- gcv
+}
+
+lambda_gcv <- gcv_results$lambda[
+  which.min(gcv_results$gcv)
+]
+
+lambda_gcv
+
+min(gcv_results$gcv)
+
+ggplot(gcv_results, aes(x = lambda, y = gcv)) +
+  geom_line() +
+  geom_point() +
+  geom_vline(
+    xintercept = lambda_gcv,
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "Generalized Cross-Validation",
+    x = "Lambda",
+    y = "GCV"
+  )
+```
+
+
+
+c. Fix all three choices before examining the test responses. Refit OLS and ridge at $\lambda_{\min}$, $\lambda_{\mathrm{1se}}$, and $\lambda_{\mathrm{GCV}}$ using all training observations. Report each model's training MSE, test MSE, and effective degrees of freedom. Interpret the differences and explain why the model with the smallest observed test MSE must not be selected after viewing this table.
+
+```{r}
+# ------------------------------------------------------------
+# Final models
+# ------------------------------------------------------------
+
+chosen_lambdas <- c(
+  OLS = 0,
+  lambda_min = lambda_min,
+  lambda_1se = lambda_1se,
+  lambda_GCV = lambda_gcv
+)
+
+final_results <- data.frame(
+  model = names(chosen_lambdas),
+  lambda = chosen_lambdas,
+  train_mse = NA_real_,
+  test_mse = NA_real_,
+  df_eff = NA_real_
+)
+
+for (i in seq_along(chosen_lambdas)) {
+
+  lambda_value <- chosen_lambdas[i]
+
+  # Fit using ALL training observations
+  fit <- fit_ridge(
+    X = X_train_scaled,
+    y = y_train,
+    X_new = X_train_scaled,
+    lambda = lambda_value
+  )
+
+  # Training predictions
+  train_predictions <- fit$predictions
+
+  # Test predictions
+  X_test_scaled <- sweep(
+    X_test,
+    2,
+    scaling_all$means,
+    "-"
+  )
+
+  X_test_scaled <- sweep(
+    X_test_scaled,
+    2,
+    scaling_all$scales,
+    "/"
+  )
+
+  test_predictions <- as.vector(
+    fit$intercept +
+      X_test_scaled %*% fit$beta
+  )
+
+  # MSE
+  train_mse <- mean(
+    (y_train - train_predictions)^2
+  )
+
+  test_mse <- mean(
+    (y_test - test_predictions)^2
+  )
+
+  # Effective degrees of freedom
+  df_eff <- 1 + sum(
+    singular_values^2 /
+      (singular_values^2 + n * lambda_value)
+  )
+
+  final_results$train_mse[i] <- train_mse
+  final_results$test_mse[i] <- test_mse
+  final_results$df_eff[i] <- df_eff
+}
+
+final_results
+```
+
+It must not be selected because the test MSE is evaluated on the test set, which was not used in model selection. Choosing a model based on its performance on the test set would lead to overfitting and an overly optimistic estimate of its predictive performance. The correct approach is to select the model based on cross-validation or GCV results from the training data, which provides a more reliable estimate of how the model will perform on unseen data.
+
+::: {.callout-tip title="Starter workflow"}
+After matching the two files by `row_id`, use this order:
+
+```text
+for each validation fold:
+    estimate predictor means and scales from the other nine folds
+    for each lambda:
+        fit on those nine folds and record validation MSE
+summarize the ten fold errors and fix lambda_min and lambda_1se
+compute GCV using all training observations and fix lambda_GCV
+only then refit the four reported models and evaluate the test responses
+```
+:::
+
+## Reference
+
+The real-estate data come from I-Cheng Yeh's [Real Estate Valuation dataset](https://archive.ics.uci.edu/dataset/477/real%2Bestate%2Bvaluation%2Bda) in the UCI Machine Learning Repository. The distributed data retain the original observations and add only the course train-test and fold assignments.
+---

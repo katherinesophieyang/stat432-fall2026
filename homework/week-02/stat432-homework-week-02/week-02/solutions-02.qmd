@@ -1,0 +1,1207 @@
+---
+title: "Homework 02 Solutions"
+pagetitle: "Homework 02 Solutions"
+body-classes: "lecture-page practice-page"
+format:
+  html:
+    page-layout: full
+    toc: true
+    toc-title: "On this page"
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show the solution code"
+---
+
+## Question 1: Training and test error under a fixed design
+
+### Original question
+
+::: {.callout-note appearance="simple" icon=false}
+Consider a linear regression problem with $n=100$ observations and $q=20$ available covariates. Generate one matrix $\mathbf X_{\mathrm{all}}\in\mathbb R^{n\times q}$ whose entries are independent $\mathcal N(0,1)$ random variables, and then keep this realized matrix fixed. Let
+
+$$
+\beta_k=0.4^{\sqrt{k}},
+\qquad k=1,\ldots,q,
+$$
+
+and define
+
+$$
+\boldsymbol\mu=\mathbf X_{\mathrm{all}}\boldsymbol\beta.
+$$
+
+Generate one training response and one independent test response from
+
+$$
+\begin{aligned}
+\mathbf y
+&=\boldsymbol\mu+\boldsymbol\epsilon,\\
+\mathbf y^*
+&=\boldsymbol\mu+\boldsymbol\epsilon^*,
+\end{aligned}
+$$
+
+where
+
+$$
+\boldsymbol\epsilon,\boldsymbol\epsilon^*
+\overset{\mathrm{ind}}{\sim}
+\mathcal N_n(\mathbf 0,\mathbf I_n).
+$$
+
+Here $\mathbf I_n$ is the $n\times n$ identity matrix.
+
+For $j=0,1,\ldots,q$, fit a linear model with an intercept and the first $j$ columns of $\mathbf X_{\mathrm{all}}$ using $\mathbf y$. If $\widehat{\boldsymbol\mu}_j$ is its fitted mean vector, define
+
+$$
+\operatorname{MSE}_{\mathrm{train},j}
+=\frac{1}{n}
+\left\lVert
+\mathbf y-\widehat{\boldsymbol\mu}_j
+\right\rVert_2^2,
+$$
+
+and
+
+$$
+\operatorname{MSE}_{\mathrm{test},j}
+=\frac{1}{n}
+\left\lVert
+\mathbf y^*-\widehat{\boldsymbol\mu}_j
+\right\rVert_2^2.
+$$
+
+Repeat this process independently 200 times, keeping $\mathbf X_{\mathrm{all}}$ fixed.
+
+Use seed `43202` before generating $\mathbf X_{\mathrm{all}}$ and the response errors. R and Python use different random-number generators, so their exact numerical values need not agree.
+
+a. For each $j$, calculate the average training and test MSE over the 200 simulation runs. Plot both curves against $j$. Verify numerically that training MSE does not increase as predictors are added in each simulation run.
+
+b. For the model containing the first $j$ predictors, write
+
+$$
+\mathbf X_j
+=
+[\mathbf 1,\mathbf x_1,\ldots,\mathbf x_j],
+\qquad
+\mathbf H_j
+=
+\mathbf X_j
+(\mathbf X_j^{\mathsf T}\mathbf X_j)^{-1}
+\mathbf X_j^{\mathsf T}.
+$$
+
+Let $p_j=j+1$ be its fitted mean-parameter count, including the intercept. Define its **total squared approximation bias** as
+
+$$
+B_j^2
+=\left\lVert
+(\mathbf I_n-\mathbf H_j)\boldsymbol\mu
+\right\rVert_2^2.
+$$
+
+Thus, $B_j^2/n$ is the mean squared approximation bias.
+
+Calculate the two theoretical expectations
+
+$$
+E\!\left(
+\operatorname{MSE}_{\mathrm{train},j}
+\mid \mathbf X_{\mathrm{all}}
+\right)
+=\frac{B_j^2}{n}+1-\frac{p_j}{n},
+$$
+
+and
+
+$$
+E\!\left(
+\operatorname{MSE}_{\mathrm{test},j}
+\mid \mathbf X_{\mathrm{all}}
+\right)
+=\frac{B_j^2}{n}+1+\frac{p_j}{n}.
+$$
+
+Add these expectations to your plot and compare them with the simulation averages.
+
+c. Add the test MSE curve from one simulation run to the plot. Explain why this single curve is less smooth than the average test MSE. Use the approximation-bias and estimation-variance terms in the expected test MSE to explain why training MSE cannot be used by itself to select the predictor count.
+:::
+
+### Solution
+
+The covariate matrix is generated once and held fixed. Each repetition then observes a fresh training response and a fresh independent test response. The conditional expectations in part b therefore average over response noise at a fixed $\mathbf X_{\mathrm{all}}$.
+
+::: {.panel-tabset group="language"}
+
+#### R
+
+```{r}
+#| label: homework-02-q1-r
+#| fig-width: 8
+#| fig-height: 5.2
+#| fig-cap: "Training and test MSE along the nested model sequence."
+
+set.seed(43202)
+n <- 100
+q <- 20
+repetitions <- 200
+
+# Generate one covariate matrix, then keep it fixed.
+X_all <- matrix(rnorm(n * q), nrow = n)
+beta <- 0.4^sqrt(1:q)
+mu <- drop(X_all %*% beta)
+
+train_mse <- test_mse <- matrix(NA_real_, repetitions, q + 1)
+
+# Each run observes a fresh training and test response.
+for (simulation_run in seq_len(repetitions)) {
+  y_train <- mu + rnorm(n)
+  y_test <- mu + rnorm(n)
+
+  # Compare every candidate model on this same response pair.
+  for (j in 0:q) {
+    X_j <- cbind(1, X_all[, seq_len(j), drop = FALSE])
+    Q <- qr.Q(qr(X_j))
+    fitted <- drop(Q %*% crossprod(Q, y_train))
+
+    train_mse[simulation_run, j + 1] <- mean((y_train - fitted)^2)
+    test_mse[simulation_run, j + 1] <- mean((y_test - fitted)^2)
+  }
+}
+
+theory_train <- theory_test <- numeric(q + 1)
+
+# Compute the fixed-design expectations separately.
+for (j in 0:q) {
+  X_j <- cbind(1, X_all[, seq_len(j), drop = FALSE])
+  Q <- qr.Q(qr(X_j))
+  projected_mu <- Q %*% crossprod(Q, mu)
+  bias_mse <- mean((mu - projected_mu)^2)
+  p_j <- ncol(X_j)
+  theory_train[j + 1] <- bias_mse + 1 - p_j / n
+  theory_test[j + 1] <- bias_mse + 1 + p_j / n
+}
+
+results_r <- data.frame(
+  j = 0:q,
+  train = colMeans(train_mse),
+  theory_train = theory_train,
+  test = colMeans(test_mse),
+  theory_test = theory_test,
+  first_test = test_mse[1, ]
+)
+
+training_is_monotone <- all(
+  apply(train_mse, 1, function(x) all(diff(x) <= 1e-10))
+)
+print(results_r[c(1, 6, 11, 16, 21), ], digits = 4)
+print(c(training_is_monotone = training_is_monotone))
+print(c(
+  minimum_average_test = which.min(results_r$test) - 1,
+  minimum_expected_test = which.min(results_r$theory_test) - 1
+))
+
+matplot(
+  results_r$j,
+  results_r[c("train", "theory_train", "test", "theory_test", "first_test")],
+  type = "l",
+  lty = c(1, 2, 1, 2, 3),
+  lwd = c(2.3, 2, 2.3, 2, 1.4),
+  col = c("#2F6FB3", "#2F6FB3", "#C84A16", "#C84A16", "gray45"),
+  xlab = "Number of predictors",
+  ylab = "Mean squared error",
+  bty = "l"
+)
+legend(
+  "topright",
+  legend = c(
+    "Average training", "Expected training",
+    "Average test", "Expected test", "Test, repetition 1"
+  ),
+  col = c("#2F6FB3", "#2F6FB3", "#C84A16", "#C84A16", "gray45"),
+  lty = c(1, 2, 1, 2, 3),
+  lwd = 2,
+  bty = "n",
+  cex = 0.82
+)
+```
+
+#### Python
+
+```{python}
+#| label: homework-02-q1-py
+#| fig-width: 8
+#| fig-height: 5.2
+#| fig-cap: "Training and test MSE along the nested model sequence."
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+rng = np.random.default_rng(43202)
+n = 100
+q = 20
+repetitions = 200
+
+# Generate one covariate matrix, then keep it fixed.
+X_all = rng.normal(size=(n, q))
+beta = 0.4 ** np.sqrt(np.arange(1, q + 1))
+mu = X_all @ beta
+
+train_mse = np.empty((repetitions, q + 1))
+test_mse = np.empty((repetitions, q + 1))
+
+# Each run observes a fresh training and test response.
+for simulation_run in range(repetitions):
+    y_train = mu + rng.normal(size=n)
+    y_test = mu + rng.normal(size=n)
+
+    # Compare every candidate model on this same response pair.
+    for j in range(q + 1):
+        X_j = np.column_stack((np.ones(n), X_all[:, :j]))
+        Q = np.linalg.qr(X_j, mode="reduced")[0]
+        fitted = Q @ (Q.T @ y_train)
+
+        train_mse[simulation_run, j] = np.mean((y_train - fitted) ** 2)
+        test_mse[simulation_run, j] = np.mean((y_test - fitted) ** 2)
+
+theory_train = np.empty(q + 1)
+theory_test = np.empty(q + 1)
+
+# Compute the fixed-design expectations separately.
+for j in range(q + 1):
+    X_j = np.column_stack((np.ones(n), X_all[:, :j]))
+    Q = np.linalg.qr(X_j, mode="reduced")[0]
+    projected_mu = Q @ (Q.T @ mu)
+    bias_mse = np.mean((mu - projected_mu) ** 2)
+    p_j = X_j.shape[1]
+    theory_train[j] = bias_mse + 1 - p_j / n
+    theory_test[j] = bias_mse + 1 + p_j / n
+
+average_train = train_mse.mean(axis=0)
+average_test = test_mse.mean(axis=0)
+training_is_monotone = np.all(np.diff(train_mse, axis=1) <= 1e-10)
+
+for j in [0, 5, 10, 15, 20]:
+    print(
+        f"j={j:2d}, train={average_train[j]:.4f}, "
+        f"E(train)={theory_train[j]:.4f}, "
+        f"test={average_test[j]:.4f}, "
+        f"E(test)={theory_test[j]:.4f}"
+    )
+print("Training MSE is monotone:", training_is_monotone)
+print("Minimum average test:", int(np.argmin(average_test)))
+print("Minimum expected test:", int(np.argmin(theory_test)))
+
+fig, ax = plt.subplots(figsize=(8, 5.2))
+j_values = np.arange(q + 1)
+ax.plot(j_values, average_train, color="#2F6FB3", lw=2.3,
+        label="Average training")
+ax.plot(j_values, theory_train, "--", color="#2F6FB3", lw=2,
+        label="Expected training")
+ax.plot(j_values, average_test, color="#C84A16", lw=2.3,
+        label="Average test")
+ax.plot(j_values, theory_test, "--", color="#C84A16", lw=2,
+        label="Expected test")
+ax.plot(j_values, test_mse[0], ":", color="0.45", lw=1.4,
+        label="Test, repetition 1")
+ax.set(xlabel="Number of predictors", ylabel="Mean squared error")
+ax.spines[["top", "right"]].set_visible(False)
+ax.legend(frameon=False, fontsize=8)
+fig.tight_layout()
+plt.show()
+```
+
+:::
+
+The simulation averages should be close to their theoretical expectations, apart from Monte Carlo error. The training curve decreases because every larger model contains the previous model.
+
+Expected test MSE contains the mean squared approximation bias $B_j^2/n$, which generally decreases, and the estimation-variance term $p_j/n$, which increases. Their competition can produce an interior minimum. A single test-MSE curve is irregular because it retains the random variation from one response vector.
+
+Expected training MSE contains $-p_j/n$ instead of $+p_j/n$. It therefore rewards the flexibility that allows a model to follow training noise and cannot select the predictor count honestly by itself.
+
+
+## Question 2: Prediction error at one target point
+
+### Original question
+
+::: {.callout-note appearance="simple" icon=false}
+Let $n=100$, $q=6$, and $\sigma^2=1$. Construct the fixed covariate matrix $\mathbf X_{\mathrm{all}}\in\mathbb R^{n\times q}$ with entries
+
+$$
+(\mathbf X_{\mathrm{all}})_{ik}
+=\sqrt{2}\cos\left\{
+\frac{\pi k(i-\tfrac12)}{n}
+\right\},
+\qquad
+i=1,\ldots,n,
+\quad
+k=1,\ldots,q.
+$$
+
+Its columns satisfy
+
+$$
+\mathbf 1^{\mathsf T}\mathbf X_{\mathrm{all}}=\mathbf 0^{\mathsf T},
+\qquad
+\frac{1}{n}\mathbf X_{\mathrm{all}}^{\mathsf T}\mathbf X_{\mathrm{all}}=\mathbf I_q.
+$$
+
+Here $\mathbf I_q$ is the $q\times q$ identity matrix.
+
+The following code shows a direct construction of $\mathbf X_{\mathrm{all}}$.
+
+::: {.panel-tabset group="language"}
+
+### R
+
+```{r}
+#| eval: false
+n <- 100
+q <- 6
+X_all <- outer(
+  1:n, 1:q,
+  function(i, k) sqrt(2) * cos(pi * k * (i - 0.5) / n)
+)
+```
+
+### Python
+
+```{python}
+#| eval: false
+import numpy as np
+
+n, q = 100, 6
+i = np.arange(1, n + 1)[:, None]
+k = np.arange(1, q + 1)[None, :]
+X_all = np.sqrt(2) * np.cos(np.pi * k * (i - 0.5) / n)
+```
+
+:::
+
+Keep $\mathbf X_{\mathrm{all}}$ fixed and generate one training response from
+
+$$
+\mathbf y
+=\mathbf X_{\mathrm{all}}\boldsymbol\beta+\boldsymbol\epsilon,
+\qquad
+\boldsymbol\beta
+=(0.5,0.5,0.5,0.5,0.5,0.5)^{\mathsf T},
+$$
+
+where
+
+$$
+\boldsymbol\epsilon
+\sim
+\mathcal N_n(\mathbf 0,\mathbf I_n).
+$$
+
+Here $\mathbf I_n$ is the $n\times n$ identity matrix.
+
+For $j=0,\ldots,6$, fit a linear model with an intercept and the first $j$ predictors. Consider prediction of the mean response at
+
+$$
+\mathbf x_0=(0,1,0,0,1,0)^{\mathsf T}.
+$$
+
+Write
+
+$$
+\mu_0=\mathbf x_0^{\mathsf T}\boldsymbol\beta,
+$$
+
+and let $\widehat\mu_{0,j}$ be the prediction from the model containing the first $j$ predictors. Here $x_{0k}$ denotes the $k$th coordinate of $\mathbf x_0$. For this design,
+
+$$
+E\!\left[
+\left(\widehat\mu_{0,j}-\mu_0\right)^2
+\mid \mathbf X_{\mathrm{all}}
+\right]
+=
+\left(
+\sum_{k=j+1}^{q}x_{0k}\beta_k
+\right)^2
++\frac{\sigma^2}{n}
+\left(
+1+\sum_{k=1}^{j}x_{0k}^2
+\right).
+$$
+
+a. Calculate $\mu_0$ and the theoretical expected squared error for $j=0,\ldots,6$. Identify the values of $j$ where this error changes and where it remains unchanged.
+
+b. Use seed `43203`. Generate the response, fit the models, and calculate
+
+$$
+\left(\widehat\mu_{0,j}-\mu_0\right)^2.
+$$
+
+Repeat this independently 200 times. Plot the simulation averages and theoretical expectations together. Report the smallest $j$ that minimizes the theoretical error.
+
+c. All six regression coefficients are nonzero. Explain why only predictors 2 and 5 contribute directly to the mean response at $\mathbf x_0$. Contrast this target-specific error with the test MSE averaged over all rows of $\mathbf X_{\mathrm{all}}$ in Question 1.
+:::
+
+### Solution
+
+The target mean is
+
+$$
+\mu_0
+=\mathbf x_0^{\mathsf T}\boldsymbol\beta
+=0.5+0.5
+=1.
+$$
+
+Only coordinates 2 and 5 of $\mathbf x_0$ are nonzero. The theoretical values are:
+
+| $j$ | Squared target-point bias | Estimation variance | Expected squared error |
+|---:|---:|---:|---:|
+| 0 | 1.00 | 0.01 | 1.01 |
+| 1 | 1.00 | 0.01 | 1.01 |
+| 2 | 0.25 | 0.02 | 0.27 |
+| 3 | 0.25 | 0.02 | 0.27 |
+| 4 | 0.25 | 0.02 | 0.27 |
+| 5 | 0.00 | 0.03 | 0.03 |
+| 6 | 0.00 | 0.03 | 0.03 |
+
+The smallest predictor count that minimizes the expected error is $j=5$.
+
+::: {.panel-tabset group="language"}
+
+#### R
+
+```{r}
+#| label: homework-02-q2-r
+#| fig-width: 7
+#| fig-height: 4.5
+#| fig-cap: "Squared error at the fixed target point."
+
+set.seed(43203)
+n <- 100
+q <- 6
+sigma2 <- 1
+repetitions <- 200
+
+X_all <- outer(
+  1:n, 1:q,
+  function(i, k) sqrt(2) * cos(pi * k * (i - 0.5) / n)
+)
+beta <- rep(0.5, q)
+x0 <- c(0, 1, 0, 0, 1, 0)
+mu <- drop(X_all %*% beta)
+mu0 <- sum(x0 * beta)
+
+stopifnot(
+  max(abs(colSums(X_all))) < 1e-10,
+  max(abs(crossprod(X_all) / n - diag(q))) < 1e-10
+)
+
+simulation_error <- matrix(NA_real_, repetitions, q + 1)
+
+# Each run observes a fresh response.
+for (simulation_run in seq_len(repetitions)) {
+  y_train <- mu + rnorm(n)
+
+  # Compare every candidate model on this same response.
+  for (j in 0:q) {
+    X_j <- cbind(1, X_all[, seq_len(j), drop = FALSE])
+    coefficients <- solve(crossprod(X_j), crossprod(X_j, y_train))
+    target_row <- c(1, x0[seq_len(j)])
+    prediction <- drop(target_row %*% coefficients)
+    simulation_error[simulation_run, j + 1] <- (prediction - mu0)^2
+  }
+}
+
+simulated <- colMeans(simulation_error)
+theoretical <- numeric(q + 1)
+
+# Compute the target-specific expectations separately.
+for (j in 0:q) {
+  omitted <- if (j < q) (j + 1):q else integer(0)
+  omitted_signal <- sum(x0[omitted] * beta[omitted])
+  estimation_variance <- sigma2 * (1 + sum(x0[seq_len(j)]^2)) / n
+  theoretical[j + 1] <- omitted_signal^2 + estimation_variance
+}
+
+target_results_r <- data.frame(
+  j = 0:q,
+  simulated = simulated,
+  theoretical = theoretical
+)
+print(target_results_r, digits = 4)
+print(c(first_minimum = which.min(theoretical) - 1))
+
+plot(
+  0:q, simulated,
+  type = "o", pch = 16, lwd = 2.3, col = "#2F6FB3",
+  xlab = "Number of predictors",
+  ylab = "Mean squared error at the target",
+  bty = "l"
+)
+lines(0:q, theoretical, lty = 2, lwd = 2, col = "#C84A16")
+abline(v = c(2, 5), lty = 3, col = "gray60")
+legend(
+  "topright",
+  legend = c("Simulation average", "Theoretical expectation"),
+  col = c("#2F6FB3", "#C84A16"),
+  lty = c(1, 2), pch = c(16, NA), lwd = 2, bty = "n"
+)
+```
+
+#### Python
+
+```{python}
+#| label: homework-02-q2-py
+#| fig-width: 7
+#| fig-height: 4.5
+#| fig-cap: "Squared error at the fixed target point."
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+rng_q2 = np.random.default_rng(43203)
+n = 100
+q = 6
+sigma2 = 1.0
+repetitions = 200
+
+i = np.arange(1, n + 1)[:, None]
+k = np.arange(1, q + 1)[None, :]
+X_all = np.sqrt(2) * np.cos(np.pi * k * (i - 0.5) / n)
+
+beta = np.repeat(0.5, q)
+x0 = np.array([0, 1, 0, 0, 1, 0], dtype=float)
+mu = X_all @ beta
+mu0 = x0 @ beta
+
+assert np.allclose(X_all.sum(axis=0), 0, atol=1e-10)
+assert np.allclose(X_all.T @ X_all / n, np.eye(q), atol=1e-10)
+
+simulation_error = np.empty((repetitions, q + 1))
+
+# Each run observes a fresh response.
+for simulation_run in range(repetitions):
+    y_train = mu + rng_q2.normal(size=n)
+
+    # Compare every candidate model on this same response.
+    for j in range(q + 1):
+        X_j = np.column_stack((np.ones(n), X_all[:, :j]))
+        coefficients = np.linalg.solve(X_j.T @ X_j, X_j.T @ y_train)
+        target_row = np.r_[1, x0[:j]]
+        prediction = target_row @ coefficients
+        simulation_error[simulation_run, j] = (prediction - mu0) ** 2
+
+simulated = simulation_error.mean(axis=0)
+theoretical = np.empty(q + 1)
+
+# Compute the target-specific expectations separately.
+for j in range(q + 1):
+    omitted_signal = x0[j:] @ beta[j:]
+    estimation_variance = sigma2 * (1 + x0[:j] @ x0[:j]) / n
+    theoretical[j] = omitted_signal**2 + estimation_variance
+
+for j in range(q + 1):
+    print(
+        f"j={j}, simulated={simulated[j]:.4f}, "
+        f"theoretical={theoretical[j]:.4f}"
+    )
+print("First minimum:", int(np.argmin(theoretical)))
+
+fig, ax = plt.subplots(figsize=(7, 4.5))
+j_values = np.arange(q + 1)
+ax.plot(j_values, simulated, "o-", color="#2F6FB3", lw=2.3,
+        label="Simulation average")
+ax.plot(j_values, theoretical, "--", color="#C84A16", lw=2,
+        label="Theoretical expectation")
+ax.axvline(2, color="0.6", linestyle=":")
+ax.axvline(5, color="0.6", linestyle=":")
+ax.set(
+    xlabel="Number of predictors",
+    ylabel="Mean squared error at the target",
+    xticks=j_values,
+)
+ax.spines[["top", "right"]].set_visible(False)
+ax.legend(frameon=False)
+fig.tight_layout()
+plt.show()
+```
+
+:::
+
+The error changes only when predictor 2 or 5 is added. The other target coordinates are zero, so their fitted coefficients are multiplied by zero in this prediction.
+
+This is a target-specific conclusion. Average test MSE over the entire design gives a predictor weight wherever its values are nonzero across the design rows. A predictor can therefore matter for average prediction even when it does not contribute at one particular target.
+
+
+## Question 3: The optimism correction
+
+### Original question
+
+::: {.callout-note appearance="simple" icon=false}
+Choose one candidate model before observing the response. Let $\mathbf X\in\mathbb R^{n\times p}$ be its full-rank design matrix, including the intercept, and let
+
+$$
+\mathbf H
+=\mathbf X
+(\mathbf X^{\mathsf T}\mathbf X)^{-1}
+\mathbf X^{\mathsf T}
+$$
+
+be its hat matrix. Suppose
+
+$$
+\mathbf y=\boldsymbol\mu+\boldsymbol\epsilon,
+\qquad
+\mathbf y^*=\boldsymbol\mu+\boldsymbol\epsilon^*,
+$$
+
+Conditional on the fixed design $\mathbf X$, the two error vectors are independent, have mean zero, and have covariance matrix $\sigma^2\mathbf I_n$. Define
+
+$$
+\operatorname{MSE}_{\mathrm{train}}
+=
+\frac{1}{n}
+\left\lVert
+\mathbf y-\mathbf H\mathbf y
+\right\rVert_2^2,
+\qquad
+\operatorname{MSE}_{\mathrm{test}}
+=
+\frac{1}{n}
+\left\lVert
+\mathbf y^*-\mathbf H\mathbf y
+\right\rVert_2^2.
+$$
+
+The conditional bias vector of the fitted mean is
+
+$$
+E(\mathbf H\mathbf y\mid\mathbf X)-\boldsymbol\mu
+=
+-(\mathbf I_n-\mathbf H)\boldsymbol\mu.
+$$
+
+Let $B^2$ denote the **total squared approximation bias**:
+
+$$
+B^2
+=\left\lVert
+(\mathbf I_n-\mathbf H)\boldsymbol\mu
+\right\rVert_2^2.
+$$
+
+Thus, $B^2/n$ is the mean squared approximation bias.
+
+You may use
+
+$$
+\mathbf H^{\mathsf T}=\mathbf H,
+\qquad
+\mathbf H^2=\mathbf H,
+\qquad
+\operatorname{tr}(\mathbf H)=p.
+$$
+
+For any fixed matrix $\mathbf A$, you may also use
+
+$$
+E\!\left(
+\boldsymbol\epsilon^{\mathsf T}
+\mathbf A
+\boldsymbol\epsilon
+\mid \mathbf X
+\right)
+=\sigma^2\operatorname{tr}(\mathbf A).
+$$
+
+a. Derive
+
+$$
+E(\operatorname{MSE}_{\mathrm{train}}\mid\mathbf X)
+=\frac{B^2}{n}
++\sigma^2\left(1-\frac{p}{n}\right),
+$$
+
+and
+
+$$
+E(\operatorname{MSE}_{\mathrm{test}}\mid\mathbf X)
+=\frac{B^2}{n}
++\sigma^2\left(1+\frac{p}{n}\right).
+$$
+
+b. Deduce the expected optimism, defined as $E(\operatorname{MSE}_{\mathrm{test}}-\operatorname{MSE}_{\mathrm{train}}\mid\mathbf X)$. For
+
+$$
+n=120,
+\qquad
+p=5,
+\qquad
+\frac{B^2}{n}=0.04,
+\qquad
+\sigma^2=1,
+$$
+
+calculate the expected training MSE, expected test MSE, and their difference. Explain why the ordering need not hold for every realized pair of responses.
+
+c. Continue with $n=120$ and $p=5$. Suppose the candidate model has residual sum of squares $\operatorname{RSS}=116.4$, and suppose a common estimate of the error variance is $\widehat\sigma^2=0.96$.
+
+Calculate
+
+$$
+\widehat{\operatorname{MSE}}_{\mathrm{test}}
+=\frac{
+\operatorname{RSS}+2p\widehat\sigma^2
+}{n},
+$$
+
+and
+
+$$
+C_p
+=\frac{\operatorname{RSS}}{\widehat\sigma^2}
+-n+2p.
+$$
+
+Show how these two quantities are related, and explain why minimizing $C_p$ is equivalent to minimizing the corrected test MSE when $n$ and $\widehat\sigma^2$ are common to all candidate models.
+:::
+
+### Solution
+
+The training residual is
+
+$$
+\begin{aligned}
+\mathbf y-\mathbf H\mathbf y
+&=(\mathbf I_n-\mathbf H)
+(\boldsymbol\mu+\boldsymbol\epsilon)\\
+&=(\mathbf I_n-\mathbf H)\boldsymbol\mu
++(\mathbf I_n-\mathbf H)\boldsymbol\epsilon.
+\end{aligned}
+$$
+
+The cross term has expectation zero. Since $\mathbf I_n-\mathbf H$ is symmetric and idempotent,
+
+$$
+\begin{aligned}
+E\!\left(
+\left\lVert
+\mathbf y-\mathbf H\mathbf y
+\right\rVert_2^2
+\mid\mathbf X
+\right)
+&=
+B^2+\sigma^2\operatorname{tr}(\mathbf I_n-\mathbf H)\\
+&=
+B^2+\sigma^2(n-p).
+\end{aligned}
+$$
+
+Dividing by $n$ gives the stated expected training MSE.
+
+For the independent test response,
+
+$$
+\mathbf y^*-\mathbf H\mathbf y
+=
+(\mathbf I_n-\mathbf H)\boldsymbol\mu
++\boldsymbol\epsilon^*
+-\mathbf H\boldsymbol\epsilon.
+$$
+
+All cross terms again have expectation zero. Independence gives
+
+$$
+\begin{aligned}
+E\!\left(
+\left\lVert
+\boldsymbol\epsilon^*
+-\mathbf H\boldsymbol\epsilon
+\right\rVert_2^2
+\mid\mathbf X
+\right)
+&=
+n\sigma^2+
+\sigma^2\operatorname{tr}(\mathbf H)\\
+&=
+\sigma^2(n+p).
+\end{aligned}
+$$
+
+Therefore,
+
+$$
+E(\operatorname{MSE}_{\mathrm{test}}\mid\mathbf X)
+=
+\frac{B^2}{n}
++\sigma^2\left(1+\frac{p}{n}\right).
+$$
+
+Subtracting the expectations gives
+
+$$
+E(
+\operatorname{MSE}_{\mathrm{test}}
+-\operatorname{MSE}_{\mathrm{train}}
+\mid\mathbf X
+)
+=
+\frac{2p\sigma^2}{n}.
+$$
+
+For the stated values,
+
+$$
+E(\operatorname{MSE}_{\mathrm{train}}\mid\mathbf X)
+=
+0.04+1-\frac{5}{120}
+=
+0.998333,
+$$
+
+$$
+E(\operatorname{MSE}_{\mathrm{test}}\mid\mathbf X)
+=
+0.04+1+\frac{5}{120}
+=
+1.081667,
+$$
+
+and their difference is $0.083333$. These are long-run averages, so a particular test MSE can still be smaller than its corresponding training MSE.
+
+The corrected estimate is
+
+$$
+\widehat{\operatorname{MSE}}_{\mathrm{test}}
+=
+\frac{116.4+2(5)(0.96)}{120}
+=
+1.05.
+$$
+
+Mallows' $C_p$ is
+
+$$
+C_p
+=
+\frac{116.4}{0.96}-120+2(5)
+=
+11.25.
+$$
+
+Their relationship is
+
+$$
+\begin{aligned}
+\frac{\widehat\sigma^2(C_p+n)}{n}
+&=
+\frac{0.96(11.25+120)}{120}\\
+&=
+1.05\\
+&=
+\frac{\operatorname{RSS}+2p\widehat\sigma^2}{n}.
+\end{aligned}
+$$
+
+When $n$ and $\widehat\sigma^2$ are common to all candidates, this is an increasing transformation. The two criteria therefore rank the models in the same order.
+
+
+## Question 4: Comparing Mallows' $C_p$, AIC, and BIC
+
+### Original question
+
+::: {.callout-note appearance="simple" icon=false}
+Use `data/diabetes.csv`, with `y` as the response. Use rows 1 through 370 as the training data, and let $n=370$ denote the training sample size. Do not use rows 371 through 442 in this question. Fit the following ordinary least-squares models, each with an intercept.
+
+| Model | Predictors | $p$ |
+|---|---|---:|
+| Model A | `bmi`, `bp`, `s5`, `sex`, `s1`, `s2`, `s4` | 8 |
+| Model B | all predictors in Model A, followed by `s6` | 9 |
+| Full reference | all ten predictors | 11 |
+
+Here $p$ counts fitted mean parameters, including the intercept. Estimate one common noise variance from the full reference model:
+
+$$
+\widehat\sigma^2_{\mathrm{full}}
+=\frac{\operatorname{RSS}_{\mathrm{full}}}{n-11}.
+$$
+
+For Models A and B, calculate
+
+$$
+C_p
+=\frac{\operatorname{RSS}}{\widehat\sigma^2_{\mathrm{full}}}
+-n+2p,
+$$
+
+$$
+\operatorname{AIC}^{\mathrm{red}}
+=n\log\left(\frac{\operatorname{RSS}}{n}\right)+2p,
+$$
+
+and
+
+$$
+\operatorname{BIC}^{\mathrm{red}}
+=n\log\left(\frac{\operatorname{RSS}}{n}\right)
++p\log(n).
+$$
+
+The reduced AIC and BIC omit constants shared by the two candidate models. Smaller values are preferred within each criterion.
+
+a. Fit the three models. Report $p$, RSS, the residual degrees of freedom of the full model, and $\widehat\sigma^2_{\mathrm{full}}$.
+
+b. Calculate $C_p$, reduced AIC, and reduced BIC for Models A and B. State which model each criterion selects. Do not compare numerical values across different criteria.
+
+c. Compare the improvement in fit from adding `s6` with the one-parameter penalty under each criterion. Use this comparison to explain any disagreement. Why does selecting a model not establish that it is the true data-generating model?
+:::
+
+### Solution
+
+The full model is used only to estimate one common noise variance. Using a different variance estimate for each candidate would change the $C_p$ comparison.
+
+::: {.panel-tabset group="language"}
+
+#### R
+
+```{r}
+#| label: homework-02-q4-r
+
+data_candidates <- c(
+  "data/diabetes.csv",
+  "../../../data/week-02/diabetes.csv",
+  "data/week-02/diabetes.csv"
+)
+data_file <- data_candidates[file.exists(data_candidates)][1]
+stopifnot(!is.na(data_file))
+training <- read.csv(data_file, check.names = FALSE)[1:370, ]
+n <- nrow(training)
+
+model_variables <- list(
+  A = c("bmi", "bp", "s5", "sex", "s1", "s2", "s4"),
+  B = c("bmi", "bp", "s5", "sex", "s1", "s2", "s4", "s6"),
+  Full = c(
+    "age", "sex", "bmi", "bp", "s1",
+    "s2", "s3", "s4", "s5", "s6"
+  )
+)
+
+fit_rss <- function(variables) {
+  # Construct the intercept explicitly so p is transparent.
+  X_model <- cbind(1, as.matrix(training[variables]))
+  fit <- lm.fit(X_model, training$y)
+  sum(fit$residuals^2)
+}
+
+rss <- vapply(model_variables, fit_rss, numeric(1))
+p <- vapply(
+  model_variables,
+  function(variables) length(variables) + 1,
+  numeric(1)
+)
+
+residual_df <- n - p["Full"]
+sigma2_full <- rss["Full"] / residual_df
+
+results_r <- data.frame(
+  model = c("Model A", "Model B"),
+  p = unname(p[c("A", "B")]),
+  rss = unname(rss[c("A", "B")])
+)
+results_r$cp <- results_r$rss / sigma2_full - n + 2 * results_r$p
+results_r$aic <- n * log(results_r$rss / n) + 2 * results_r$p
+results_r$bic <- n * log(results_r$rss / n) + log(n) * results_r$p
+
+fit_gain <- n * log(rss["A"] / rss["B"])
+cp_gain <- (rss["A"] - rss["B"]) / sigma2_full
+
+print(c(residual_df = residual_df, sigma2_full = sigma2_full))
+print(results_r, digits = 7)
+print(c(
+  aic_bic_fit_gain = fit_gain,
+  cp_fit_gain = cp_gain,
+  aic_penalty = 2,
+  bic_penalty = log(n),
+  cp_penalty = 2
+))
+```
+
+#### Python
+
+```{python}
+#| label: homework-02-q4-py
+
+from pathlib import Path
+import numpy as np
+import pandas as pd
+
+data_candidates = [
+    Path("data/diabetes.csv"),
+    Path("../../../data/week-02/diabetes.csv"),
+    Path("data/week-02/diabetes.csv"),
+]
+data_file = next(path for path in data_candidates if path.exists())
+training = pd.read_csv(data_file).iloc[:370].copy()
+n = len(training)
+
+model_variables = {
+    "A": ["bmi", "bp", "s5", "sex", "s1", "s2", "s4"],
+    "B": ["bmi", "bp", "s5", "sex", "s1", "s2", "s4", "s6"],
+    "Full": [
+        "age", "sex", "bmi", "bp", "s1",
+        "s2", "s3", "s4", "s5", "s6",
+    ],
+}
+
+
+def fit_rss(variables):
+    # Construct the intercept explicitly so p is transparent.
+    X_model = np.column_stack((
+        np.ones(n),
+        training[variables].to_numpy(),
+    ))
+    coefficients = np.linalg.lstsq(
+        X_model, training["y"].to_numpy(), rcond=None
+    )[0]
+    residuals = training["y"].to_numpy() - X_model @ coefficients
+    return float(residuals @ residuals)
+
+
+rss = {
+    name: fit_rss(variables)
+    for name, variables in model_variables.items()
+}
+p = {
+    name: len(variables) + 1
+    for name, variables in model_variables.items()
+}
+
+residual_df = n - p["Full"]
+sigma2_full = rss["Full"] / residual_df
+
+results_py = pd.DataFrame({
+    "model": ["Model A", "Model B"],
+    "p": [p["A"], p["B"]],
+    "rss": [rss["A"], rss["B"]],
+})
+results_py["cp"] = (
+    results_py["rss"] / sigma2_full - n + 2 * results_py["p"]
+)
+results_py["aic"] = (
+    n * np.log(results_py["rss"] / n) + 2 * results_py["p"]
+)
+results_py["bic"] = (
+    n * np.log(results_py["rss"] / n) + np.log(n) * results_py["p"]
+)
+
+fit_gain = n * np.log(rss["A"] / rss["B"])
+cp_gain = (rss["A"] - rss["B"]) / sigma2_full
+
+print({"residual_df": residual_df, "sigma2_full": sigma2_full})
+print(results_py.round(6).to_string(index=False))
+print({
+    "aic_bic_fit_gain": fit_gain,
+    "cp_fit_gain": cp_gain,
+    "aic_penalty": 2,
+    "bic_penalty": np.log(n),
+    "cp_penalty": 2,
+})
+```
+
+:::
+
+The full model has
+
+$$
+n-11=359
+$$
+
+residual degrees of freedom. Therefore,
+
+$$
+\widehat\sigma^2_{\mathrm{full}}
+=3034.684460.
+$$
+
+The candidate results are:
+
+| Model | $p$ | RSS | $C_p$ | Reduced AIC | Reduced BIC |
+|---|---:|---:|---:|---:|---:|
+| Model A | 8 | 1,098,908.566 | 8.116 | 2,974.640 | 3,005.948 |
+| Model B | 9 | 1,089,717.057 | 7.087 | 2,973.532 | 3,008.754 |
+
+Mallows' $C_p$ and AIC select Model B, while BIC selects Model A. The improvement in the AIC and BIC fit term is
+
+$$
+n\log\left(
+\frac{\operatorname{RSS}_{A}}
+{\operatorname{RSS}_{B}}
+\right)
+=3.108.
+$$
+
+This exceeds AIC's additional penalty of $2$, but is smaller than BIC's additional penalty $\log(n)=5.914$. On the $C_p$ scale,
+
+$$
+\frac{
+\operatorname{RSS}_{A}-\operatorname{RSS}_{B}
+}{
+\widehat\sigma^2_{\mathrm{full}}
+}
+=3.029>2.
+$$
+
+Thus, AIC and $C_p$ accept the improvement from adding `s6`, while BIC does not. This is a comparison of two candidates under particular assumptions. It does not prove that either candidate is the true data-generating model.
+
+## Question 5: Validation and final test data
+
+### Original question
+
+::: {.callout-note appearance="simple" icon=false}
+Use rows 1 through 370 of `diabetes.csv` as the training data and rows 371 through 442 as the final test data. Consider eleven nested candidate models. For $j=0,1,\ldots,10$, the model with $j$ predictors contains an intercept and the first $j$ predictors in this order:
+
+`age`, `sex`, `bmi`, `bp`, `s1`, `s2`, `s3`, `s4`, `s5`, `s6`.
+
+An analyst proposes the following procedure:
+
+1. Fit all eleven candidate models using the training data.
+2. Calculate the MSE of each model on the final test data.
+3. Select the model with the smallest test MSE.
+4. Report that minimum as the final estimate of prediction error.
+
+The analyst argues that the procedure is valid because the final test data were not used to estimate the regression coefficients.
+
+a. Identify the first step that misuses the final test data. Explain why the minimum of eleven test MSE values is generally too favorable as an estimate of the selected procedure's future prediction error.
+
+b. Rewrite the analysis using five-fold cross-validation within the training data. State how the predictor count is selected, what is refitted, and when the final test data may be used.
+
+c. Suppose the analyst has already examined all eleven test MSE values. What can still be reported transparently, and what additional data would be needed for a new final evaluation?
+:::
+
+### Solution
+
+Step 2 is the first misuse. The final test responses are used to compare the candidates, so predictor count is selected using the final test data even though the coefficients were fitted using only the training data.
+
+Each test MSE contains random variation. Taking the minimum tends to select a model whose test MSE was unusually small by chance. Reporting the same minimum as the final assessment therefore gives an optimistic estimate of future prediction error.
+
+A valid procedure is:
+
+1. Reserve rows 371 through 442 without inspecting their responses.
+2. Divide rows 1 through 370 into five folds.
+3. For each predictor count, fit on four folds and calculate MSE on the remaining fold. Repeat until every fold has served once as the validation fold.
+4. Average the five validation MSE values and select the predictor count with the smallest average.
+5. Refit the selected model using all 370 training observations.
+6. Evaluate this fitted model once on rows 371 through 442.
+
+Any data-dependent preprocessing must also be estimated within the four training folds. If all eleven final test MSE values have already been examined, the analysis can still be reported as exploratory, but the reported minimum is not an untouched final assessment. A new independent test dataset or genuinely future observations are needed for a new final evaluation.
+
+## Key ideas
+
+1. Under a fixed design, training and test responses differ only through independent response noise.
+2. Average prediction error and prediction error at one target point can favor different predictor counts.
+3. The fixed-design optimism correction is $2p\sigma^2/n$.
+4. Mallows' $C_p$, AIC, and BIC can disagree because they use different complexity penalties.
+5. A final test set is valid only if it remains untouched until the entire procedure has been chosen.
+
+## Reference
+
+James, Witten, Hastie, Tibshirani, and Taylor, [*An Introduction to Statistical Learning*](https://www.statlearning.com/), Chapters 3, 5, and 6.

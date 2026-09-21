@@ -1,0 +1,312 @@
+---
+title: "Homework 03"
+pagetitle: "Homework 03"
+body-classes: "lecture-page practice-page"
+format:
+  html:
+    embed-resources: true
+    html-math-method: mathml
+    page-layout: full
+    toc: true
+    toc-location: body
+    toc-title: "On this page"
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show the workflow"
+---
+
+## Question 1: Build an `explain-to-me` skill
+
+Create a small skill named `explain-to-me` that helps you understand a homework question.
+
+1. Design your `SKILL.md` file so that, when you explicitly ask your agent to use the skill to read a homework question, the agent communicates with you and explains what the question is asking.
+
+2. Keep the skill file short. It should contain a few useful rules, instructions, and a clear statement of your intent. For example, you may ask the agent to explain the goal of the question, clarify what work is required, and point you to an appropriate section of the Week 3 lectures: [Ridge Regression: Stability Through Shrinkage](https://teazrq.github.io/stat432rpy/topics/ridge-regression/ridge-regression.html) or [From a Penalized Objective to a Fitted Ridge Model](https://teazrq.github.io/stat432rpy/topics/ridge-regression/optimization-and-cross-validation.html). The skill should help you understand the question without completing the solution for you.
+
+3. Create the skill yourself or with the help of AI. Save it as `explain-to-me/SKILL.md`. Then ask your AI agent to install the skill using its normal skill-installation method. Test it by explicitly asking the agent to use `explain-to-me` to read and explain Question 2.
+
+4. If the skill does not work well, or if it begins to disturb your usual workflow, ask your agent to remove the installed skill. You may revise and reinstall it if you wish.
+
+5. In all cases, append the complete contents of your developed `explain-to-me/SKILL.md` file at the end of your Homework 3 submission under the heading **`explain-to-me` skill**.
+
+## Question 2: Ridge regression with nearly collinear predictors
+
+Let $n=100$. Generate mutually independent standard normal random variables
+
+$$
+L_i, U_{i1}, U_{i2}, X_{i3}, X_{i4},
+\qquad i=1,\ldots,n,
+$$
+
+and define
+
+$$
+X_{i1}=L_i+0.04U_{i1},
+\qquad
+X_{i2}=L_i+0.04U_{i2}.
+$$
+
+Center and standardize each column of $\mathbf X$ to have mean zero and average squared value one, following the [lecture's scaling convention](https://teazrq.github.io/stat432rpy/topics/ridge-regression/ridge-regression.html#put-every-covariate-on-a-common-scale).
+
+Continue to use $\mathbf X\in\mathbb R^{n\times p}$ for the standardized matrix and keep it fixed throughout the question, where $p=4$ is the number of predictors. The unpenalized intercept gives $p+1=5$ total fitted coefficients. Let
+
+$$
+\boldsymbol\beta
+=
+(1.5,1.5,1,0)^{\mathsf T},
+\qquad
+\boldsymbol\mu
+=
+\mathbf X\boldsymbol\beta.
+$$
+
+Generate a training response and an independent test response at the same predictor values:
+
+$$
+\begin{aligned}
+\mathbf y
+&=
+\boldsymbol\mu+\boldsymbol\epsilon,\\
+\mathbf y^*
+&=
+\boldsymbol\mu+\boldsymbol\epsilon^*,
+\end{aligned}
+$$
+
+where
+
+$$
+\boldsymbol\epsilon,
+\boldsymbol\epsilon^*
+\overset{\mathrm{ind}}{\sim}
+\mathcal N_n(\mathbf0,\mathbf I_n).
+$$
+
+Center the training response as $\widetilde{\mathbf y}=\mathbf y-\bar y\mathbf1_n$. For each $\lambda\in\{0,0.02,0.2\}$, fit the slopes using the lecture's ridge formula:
+
+$$
+\widehat{\boldsymbol\beta}_\lambda
+=
+\left(\mathbf X^{\mathsf T}\mathbf X+n\lambda\mathbf I_p\right)^{-1}
+\mathbf X^{\mathsf T}\widetilde{\mathbf y}.
+$$
+
+The unpenalized intercept is $\widehat\beta_0=\bar y$; add this training mean back when predicting either response. The case $\lambda=0$ is ordinary least squares. Use seed `43231` before generating the design and responses. R and Python use different random-number generators, so their exact numerical results need not agree.
+
+a. Generate $\mathbf X$ once. Report the correlation between its first two columns and its largest and smallest singular values. Use these quantities to explain why the estimator contrast $\widehat\beta_1-\widehat\beta_2$ should be much more variable than $\widehat\beta_1+\widehat\beta_2$.
+
+b. Independently repeat the generation of $\mathbf y$ and $\mathbf y^*$, followed by all three fits, 200 times while keeping $\mathbf X$ fixed. Draw the training and test noise inside each repetition, then reuse that realized pair for all three values of $\lambda$. For each value of $\lambda$, report the empirical mean and standard deviation of
+
+$$
+\widehat\beta_1,
+\quad
+\widehat\beta_2,
+\quad
+\widehat\beta_1+\widehat\beta_2,
+\quad
+\widehat\beta_1-\widehat\beta_2.
+$$
+
+Also report the average training MSE and the average test MSE calculated from the independent test response, where
+
+$$
+\operatorname{MSE}_{\mathrm{test}}
+=
+\frac{1}{n}
+\left\lVert
+\mathbf y^*
+-
+\widehat\beta_0\mathbf1_n
+-
+\mathbf X\widehat{\boldsymbol\beta}
+\right\rVert_2^2.
+$$
+
+c. Interpret the coefficient estimates and test MSE using bias and variance. Explain why ridge can substantially stabilize the individual coefficients without producing an equally large change in the fitted values.
+
+## Question 3: What does ridge regression shrink?
+
+Let $\mathbf X\in\mathbb R^{n\times p}$ be a centered predictor matrix, and let $\widetilde{\mathbf y}\in\mathbb R^n$ be the centered response. Use the supplied predictor scales for this algebraic question; the columns need not have unit variance. Here $p$ counts predictors, $\boldsymbol\beta\in\mathbb R^p$ contains their slopes, and $p+1$ counts all fitted coefficients, including the separately fitted, unpenalized intercept. Ridge regression minimizes
+
+$$
+L_\lambda(\boldsymbol\beta)
+=
+\frac{1}{2n}
+\left\lVert
+\widetilde{\mathbf y}-\mathbf X\boldsymbol\beta
+\right\rVert_2^2
++
+\frac{\lambda}{2}
+\lVert\boldsymbol\beta\rVert_2^2.
+$$
+
+a. Derive the ridge normal equation
+
+$$
+\left(
+\mathbf X^{\mathsf T}\mathbf X
++n\lambda\mathbf I_p
+\right)
+\widehat{\boldsymbol\beta}_\lambda
+=
+\mathbf X^{\mathsf T}\widetilde{\mathbf y}.
+$$
+
+Explain why it has a unique solution whenever $\lambda>0$, even if $\mathbf X$ is rank deficient or $p>n$.
+
+b. Let
+
+$$
+\mathbf X
+=
+\mathbf U_r\mathbf D_r\mathbf V_r^{\mathsf T}
+$$
+
+be a compact singular value decomposition, where $r=\operatorname{rank}(\mathbf X)$, $\mathbf U_r\in\mathbb R^{n\times r}$, $\mathbf D_r\in\mathbb R^{r\times r}$, and $\mathbf V_r\in\mathbb R^{p\times r}$. Show that ridge multiplies the fitted response component in the $j$th left singular-vector direction, for $j=1,\ldots,r$, by
+
+$$
+\rho_j(\lambda)
+=
+\frac{d_j^2}{d_j^2+n\lambda}.
+$$
+
+Suppose $n=100$, $\lambda=0.01$, and the nonzero singular values are
+
+$$
+d_1=10,
+\qquad
+d_2=2,
+\qquad
+d_3=0.2.
+$$
+
+Calculate the three shrinkage factors and the total effective degrees of freedom, including the unpenalized intercept:
+
+$$
+\operatorname{df}_{\mathrm{eff}}(\lambda)
+=
+1+\sum_{j=1}^3\rho_j(\lambda).
+$$
+
+c. Which direction receives the strongest shrinkage? Explain why shrinking this direction can reduce prediction variance. Under what circumstance could the same shrinkage produce substantial prediction bias?
+
+## Question 4: Ridge regression and optimization
+
+Let $\mathbf X\in\mathbb R^{n\times p}$ be a centered predictor matrix with $p=2$. Its columns need not have unit variance in this question. The intercept is fitted separately and is not penalized. Suppose the two eigenvalues of
+
+$$
+\mathbf A_0
+=
+\frac{1}{n}\mathbf X^{\mathsf T}\mathbf X
+$$
+
+are $9$ and $0.01$. Ridge regression with $\lambda=0.09$ has curvature matrix
+
+$$
+\mathbf A_\lambda
+=
+\frac{1}{n}\mathbf X^{\mathsf T}\mathbf X
++
+\lambda\mathbf I_p.
+$$
+
+a. Calculate the condition numbers of $\mathbf A_0$ and $\mathbf A_\lambda$. Explain what the change says about the geometry of the ridge objective.
+
+b. Gradient descent uses
+
+$$
+\boldsymbol\beta^{(k+1)}
+=
+\boldsymbol\beta^{(k)}
+-
+\eta\nabla L_\lambda\!\left(\boldsymbol\beta^{(k)}\right).
+$$
+
+Let $\widehat{\boldsymbol\beta}_\lambda$ be the ridge minimizer and define the optimization error
+
+$$
+\mathbf e^{(k)}
+=
+\boldsymbol\beta^{(k)}
+-
+\widehat{\boldsymbol\beta}_\lambda.
+$$
+
+Show that the component of $\mathbf e^{(k)}$ in an eigendirection with unpenalized eigenvalue $a$ is multiplied at each step by
+
+$$
+1-\eta(a+\lambda).
+$$
+
+Let $M=9.09$, the largest eigenvalue of $\mathbf A_\lambda$. Find the interval of step sizes that contracts every eigendirection. Then compare these two choices:
+
+- For $\eta=1/M$, calculate the two contraction factors and explain which direction converges faster.
+- For $\eta=2.1/M$, determine whether the method converges. Assume the initial error has a nonzero component in the eigendirection corresponding to $M$.
+
+c. Increasing $\lambda$ generally improves the condition number. Explain why choosing $\lambda$ to make gradient descent converge as quickly as possible is not a valid statistical tuning rule.
+
+## Question 5: Selecting the ridge penalty for real-estate prediction
+
+The supplied `data/realestate.csv` contains 414 real-estate transactions from Sindian District, New Taipei City, Taiwan. The quantitative response `price` is the unit house price. The six predictors are the transaction date, house age, distance to the nearest mass rapid transit station, number of nearby convenience stores, latitude, and longitude. Treat all six predictors as quantitative in this question. The column `row_id` identifies an observation and must not be used as a predictor.
+
+The file `data/realestate-split-folds.csv` assigns 332 observations to the training set and 82 observations to the final test set. It also gives ten fold labels for the training observations. Match the two files using `row_id` and do not use the test responses while selecting a model.
+
+Use the penalty grid
+
+$$
+\Lambda
+=
+\{0\}
+\mathbin{\cup}
+\left\{
+10^{-4+0.05l}:l=0,\ldots,120
+\right\}.
+$$
+
+For every fit, center and standardize each predictor using only the observations available to that fit, with the variance divided by the number of fitting observations. Center the response and leave the intercept unpenalized.
+
+a. Perform ten-fold cross-validation over $\Lambda$ using the supplied training folds. Estimate the predictor means and scales separately within each set of nine training folds. For each $\lambda$, calculate the mean validation MSE and $\operatorname{SE}(\lambda)$, the sample standard deviation of the ten fold errors divided by $\sqrt{10}$. Use this SE for the conventional one-standard-error heuristic. Plot the mean validation MSE and identify $\lambda_{\min}$. Choose $\lambda_{\mathrm{1se}}$ as the largest candidate in $\Lambda$, including OLS, satisfying
+
+$$
+\overline{\operatorname{MSE}}(\lambda)
+\leq
+\overline{\operatorname{MSE}}(\lambda_{\min})
++
+\operatorname{SE}(\lambda_{\min}).
+$$
+
+b. Use all $n=332$ training observations to calculate the [lecture's GCV criterion](https://teazrq.github.io/stat432rpy/topics/ridge-regression/optimization-and-cross-validation.html#loocv-and-gcv) for each $\lambda\in\Lambda$:
+
+$$
+\operatorname{GCV}(\lambda)
+=
+\frac{
+\operatorname{MSE}_{\mathrm{train}}(\lambda)
+}{
+\left\{
+1-\operatorname{df}_{\mathrm{eff}}(\lambda)/n
+\right\}^2
+}.
+$$
+
+Here $\operatorname{MSE}_{\mathrm{train}}$ is the training MSE, and $\operatorname{df}_{\mathrm{eff}}$ includes the unpenalized intercept, as in Question 3. Estimate means and scales once from all training observations and keep them fixed for this calculation. Plot the GCV curve and identify $\lambda_{\mathrm{GCV}}$.
+
+c. Fix all three choices before examining the test responses. Refit OLS and ridge at $\lambda_{\min}$, $\lambda_{\mathrm{1se}}$, and $\lambda_{\mathrm{GCV}}$ using all training observations. Report each model's training MSE, test MSE, and effective degrees of freedom. Interpret the differences and explain why the model with the smallest observed test MSE must not be selected after viewing this table.
+
+::: {.callout-tip title="Starter workflow"}
+After matching the two files by `row_id`, use this order:
+
+```text
+for each validation fold:
+    estimate predictor means and scales from the other nine folds
+    for each lambda:
+        fit on those nine folds and record validation MSE
+summarize the ten fold errors and fix lambda_min and lambda_1se
+compute GCV using all training observations and fix lambda_GCV
+only then refit the four reported models and evaluate the test responses
+```
+:::
+
+## Reference
+
+The real-estate data come from I-Cheng Yeh's [Real Estate Valuation dataset](https://archive.ics.uci.edu/dataset/477/real%2Bestate%2Bvaluation%2Bda) in the UCI Machine Learning Repository. The distributed data retain the original observations and add only the course train-test and fold assignments.
