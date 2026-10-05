@@ -1,0 +1,304 @@
+---
+title: "Homework 06"
+pagetitle: "Homework 06"
+body-classes: "lecture-page practice-page"
+format:
+  html:
+    embed-resources: true
+    html-math-method: mathml
+    page-layout: full
+    toc: true
+    toc-location: body
+    toc-title: "On this page"
+    toc-depth: 2
+---
+
+## Question 1: Compare KNN and logistic regression
+
+Use [breast-cancer.csv](data/breast-cancer.csv), which contains 569 cases from the [Wisconsin Diagnostic Breast Cancer dataset](https://archive.ics.uci.edu/dataset/17/breast%2Bcancer%2Bwisconsin%2Bdiagnostic). Predict `y` (1 for malignant and 0 for benign) using `mean_radius`, `mean_texture`, and `mean_smoothness`.
+
+Set a random seed and randomly split the observations into 70% training and 30% test data. Use the same split for every model. Standardize the predictors using the training means and standard deviations, and apply the same transformations to the test data.
+
+Fit ordinary logistic regression with an intercept and no penalty, and KNN with Euclidean distance, equal neighbor weights, and
+
+$$
+k\in\{5,15,25,35,45\}.
+$$
+
+Using the estimated probabilities for `y = 1` on the test data, plot all six ROC curves in one figure and report their AUC values. Which of the six fitted models do you prefer? Give a brief justification based on your results.
+
+```{r}
+library(tidyverse)
+library(class)
+library(pROC)
+
+bc <- read.csv("C:/Users/kates/.vscode/stat432-fall2026/homework/week-06/data/breast-cancer.csv")
+
+set.seed(432)
+
+n <- nrow(bc)
+train_index <- sample(1:n, size = 0.70 * n)
+
+train <- bc[train_index, ]
+test <- bc[-train_index, ]
+
+# predictors
+
+x_vars <- c("mean_radius", "mean_texture", "mean_smoothness")
+
+# standardize with training means and sds
+
+train_means <- sapply(train[x_vars], mean)
+train_sds <- sapply(train[x_vars], sd)
+
+train_x <- scale(train[x_vars],
+                 center = train_means,
+                 scale = train_sds)
+
+test_x <- scale(test[x_vars],
+                center = train_means,
+                scale = train_sds)
+
+# response
+
+train_y <- train$y
+test_y <- test$y
+
+logistic_fit <- glm(
+  y ~ mean_radius + mean_texture + mean_smoothness,
+  data = train,
+  family = binomial
+)
+
+logistic_prob <- predict(
+  logistic_fit,
+  newdata = as.data.frame(test_x),
+  type = "response"
+)
+
+# knn
+
+k_values <- c(5, 15, 25, 35, 45)
+
+knn_probs <- list()
+
+for (k in k_values) {
+
+  knn_fit <- knn(
+    train = train_x,
+    test = test_x,
+    cl = train_y,
+    k = k,
+    prob = TRUE
+  )
+   p <- attr(knn_fit, "prob")
+
+  knn_probs[[paste0("KNN k=", k)]] <-
+    ifelse(knn_fit == 1, p, 1 - p)
+}
+
+# auc values
+
+auc_values <- c(
+  Logistic = as.numeric(auc(test_y, logistic_prob))
+)
+
+for (k in k_values) {
+  auc_values[paste0("KNN k=", k)] <-
+    as.numeric(auc(test_y, knn_probs[[paste0("KNN k=", k)]]))
+}
+
+auc_values
+
+roc_logistic <- roc(test_y, logistic_prob)
+
+roc_knn <- lapply(k_values, function(k) {
+  roc(test_y, knn_probs[[paste0("KNN k=", k)]])
+})
+
+plot(
+  roc_logistic,
+  col = 1,
+  lwd = 2,
+  main = "ROC Curves: Logistic Regression vs KNN"
+)
+
+for (i in seq_along(k_values)) {
+  lines(
+    roc_knn[[i]],
+    col = i + 1,
+    lwd = 2
+  )
+}
+
+legend(
+  "bottomright",
+  legend = names(auc_values),
+  col = 1:6,
+  lwd = 2
+)
+```
+
+I prefer the KNN model with k=45 because from the the six models. The KNN model improves as k is increased, with the range being 0.933 to 0.974, approximately. However, the logistic regression model had an AUC of just 0.665, which is significantly lower. Since a higher AUC indicates better discrimination between cases, I would choose the KNN model with k=45 as the best model for this dataset.
+
+## Question 2: Training and test ROC curves
+
+Use the same data, training/test split, and standardization as in Question 1. Fit KNN with Euclidean distance, equal neighbor weights, and
+
+$$
+k\in\{1,3,5,10,20\}.
+$$
+
+Use each fitted model to estimate probabilities for both the training and test observations. For training predictions, include each observation itself among its $k$ nearest neighbors.
+
+For each $k$, use a separate panel to show the training and test ROC curves together. Report both AUC values.
+
+Explain the difference between training and test performance and how it changes with $k$. In particular, explain what happens at $k=1$ and why training performance may not reflect performance on new observations.
+
+```{r}
+k_values <- c(1, 3, 5, 10, 20)
+
+knn_prob <- function(train_x, train_y, new_x, k, training = FALSE) {
+  
+  probabilities <- numeric(nrow(new_x))
+  
+  for (i in 1:nrow(new_x)) {
+    
+    # Euclidean distance
+    distances <- sqrt(
+      rowSums(
+        sweep(train_x, 2, new_x[i, ], "-")^2
+      )
+    )
+    
+    # k closest observations
+    nearest <- order(distances)[1:k]
+    
+    probabilities[i] <- mean(train_y[nearest] == 1)
+  }
+  
+  probabilities
+}
+
+
+results <- data.frame()
+
+for (k in k_values) {
+  
+  # training predictions
+  train_prob <- knn_prob(
+    train_x = train_x,
+    train_y = train_y,
+    new_x = train_x,
+    k = k,
+    training = TRUE
+  )
+  
+  # test predictions
+  test_prob <- knn_prob(
+    train_x = train_x,
+    train_y = train_y,
+    new_x = test_x,
+    k = k,
+    training = FALSE
+  )
+  
+  # ROC curves
+  train_roc <- roc(train_y, train_prob)
+  test_roc <- roc(test_y, test_prob)
+  
+  # AUC
+  train_auc <- as.numeric(auc(train_roc))
+  test_auc <- as.numeric(auc(test_roc))
+  
+  results <- rbind(
+    results,
+    data.frame(
+      k = k,
+      train_auc = train_auc,
+      test_auc = test_auc
+    )
+  )
+}
+
+results
+
+roc_data <- data.frame()
+
+for (k in k_values) {
+  
+  train_prob <- knn_prob(train_x, train_y, train_x, k)
+  test_prob <- knn_prob(train_x, train_y, test_x, k)
+  
+  train_roc <- roc(train_y, train_prob)
+  test_roc <- roc(test_y, test_prob)
+  
+  # training ROC points
+  train_points <- data.frame(
+    specificity = train_roc$specificities,
+    sensitivity = train_roc$sensitivities,
+    dataset = "Training",
+    k = paste0("k = ", k)
+  )
+  
+  # test ROC points
+  test_points <- data.frame(
+    specificity = test_roc$specificities,
+    sensitivity = test_roc$sensitivities,
+    dataset = "Test",
+    k = paste0("k = ", k)
+  )
+  
+  roc_data <- rbind(
+    roc_data,
+    train_points,
+    test_points
+  )
+}
+
+# Plot
+ggplot(
+  roc_data,
+  aes(
+    x = 1 - specificity,
+    y = sensitivity,
+    color = dataset
+  )
+) +
+  geom_line(linewidth = 1) +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    linetype = "dashed"
+  ) +
+  facet_wrap(~ k) +
+  labs(
+    title = "Training and Test ROC Curves for KNN",
+    x = "False Positive Rate",
+    y = "True Positive Rate",
+    color = "Dataset"
+  ) +
+  theme_minimal()
+```
+
+As k increases, the training AUC decreases while the test AUC increases. At k=1, that is when the training AUC is the highest with 1, but the test AUC is at its lowest with 0.876. In this situation, it happens because each training observation can be its down nearest neighbor, and since that distance is zero since its itself, the model can just memorize the training data. Since test observations were not used to fit the model, they cannot be their own neighbors, leading to its performance being lower. As we see k increase, the test performance increases, going as high as 0.959 when k=20. Using more neighbors causes the model to be less flexible and therefore reduces overfitting individual training observations. This is why training performance may not reflect performance on new observations, since the model can fit the training data very well while not generalizing as well on unseen data. 
+
+## Question 3: Peer evaluation of Homework 5
+
+You will receive two Homework 5 submissions to review. The instructor's GitHub account, **rqzhu-aide**, will open a **GitHub Issue** in the repository containing your Homework 5 submission. It will contain links to two other students' repositories, where you can find their submitted homework reports.
+
+Open your repository's **Issues** tab on GitHub to find the assignment. You may ask AI to explain GitHub Issues or help you locate the assignment.
+
+Choose **one specific mistake or item for improvement** from any question in either report.
+
+1. **Identify the mistake or item for improvement.** State which report and question you selected, and briefly describe what is wrong or could be improved. Examples include incorrect code, a calculation error, a misinterpretation of results, a plot that could communicate the findings more clearly, or anything else you think could be done better.
+
+2. **Explain your assessment.** Quote the relevant text, code, or figure caption exactly. Explain why the selected answer is incorrect or how it could be improved, referring to its reasoning, calculations, code, figures, or interpretation. **Complete this part yourself, without AI assistance.**
+
+3. **Provide a correction.** Write a corrected or improved answer to the selected question, including any calculations, code, or figures needed.
+
+After completing your review, **open a GitHub Issue in the repository containing the report you selected**. Identify the report and question, and include your assessment and a detailed revision plan explaining what the author should change and why. Include a link to your posted GitHub Issue in your Homework 6 answer.
+
+The report I have chosen is from Owen Park, or mirgaon314, and question 1a. The part of the sentence, "...because x₃²=1 at the target is the top of the −0.3x₃² bump...", could be worded better, and is in a sense incorrect. "Top of the bump" would refer to the maximum, and the max is at x3=0, since x3=1 would give a value of -0.3. So if you move from 1 towards 0, the term becomes less negative, and the function increases, and if you move past 1, the function decreases, so it is not the maximum value. A better explanation could be that the squared bias increases as k increases in this simulation, and that at target x3=1, the -0.3x3^2 term, being nonlinear, can include different x3 values at certain points when averaging over a wider neighborhood. This could lead to different values of f(x), and this can lead to the increasing bias as k increases.
+
+Link: https://github.com/mirgaon314/stat432-fall2026/issues/3
