@@ -1,0 +1,24 @@
+SAheart LDA/QDA analysis
+Seed: 43217; n=462; training=323; test=139.
+Predictors: all nine variables other than chd; famhist Absent=1, Present=2.
+Split: stratified 70/30. Selection: stratified 5-fold CV on training data; same folds for all candidates.
+
+Cross-validation results:
+               Candidate CV_Misclassification Status Selected
+                     LDA            0.2817337     OK     TRUE
+                     QDA            0.2972136     OK    FALSE
+ Blend (QDA weight 0.25)            0.2817337     OK    FALSE
+ Blend (QDA weight 0.50)            0.2848297     OK    FALSE
+ Blend (QDA weight 0.75)            0.2941176     OK    FALSE
+
+Selected model: Ordinary LDA
+Held-out test misclassification rate: 0.2374 (23.74%)
+Test confusion matrix (observed rows, predicted columns):
+        Predicted
+Observed  0  1
+       0 74 17
+       1 16 32
+
+Interpretation: LDA assumes a shared covariance matrix; QDA estimates separate class covariance matrices.
+A posterior blend can trade model bias against estimation variance. Results may vary with the split,
+and a single held-out test set is not external validation.
