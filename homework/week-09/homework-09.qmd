@@ -1,0 +1,44 @@
+---
+title: "Homework 09"
+pagetitle: "Homework 09"
+body-classes: "lecture-page practice-page"
+format:
+  html:
+    embed-resources: true
+    html-math-method: mathml
+    page-layout: full
+    toc: true
+    toc-location: body
+    toc-title: "On this page"
+    toc-depth: 2
+---
+
+The kernel-tuning question moved here from Homework 08. A solution for Question 1 will be available after Monday, October 26, 2026. No solution will be provided for Question 2.
+
+## Question 1: Choosing an SVM kernel
+
+Use `saheart.csv` from the combined ZIP. As in Homework 7, predict `chd` using the same nine predictors, coding `famhist` as 1 for `Absent` and 2 for `Present`.
+
+Compare SVMs with a linear kernel, polynomial kernels of degrees 2 (quadratic), 3, and 4, and a radial basis kernel. Choose **no more than 20 candidate settings in total** across these kernels. Vary the cost $C$ for each kernel and the radial scale $\gamma$ for the radial kernel. State any other kernel settings you hold fixed.
+
+Divide the observations into five folds yourself and use the same folds for all candidates. Standardize predictors using only the fitting observations in each fold. Report the candidate settings and their mean cross-validation misclassification rates. Which kernel and settings do you prefer? Give a brief justification.
+
+## Question 2: Write and use a short SVM analysis skill
+
+In Homework 8, you reviewed another student's skill. Review the comments and suggestions you received on your own Homework 7 skill. Use what you learned from both sides of the peer review to write a new, shorter skill for SVM model fitting.
+
+**Write the skill by hand.** Create a `SKILL.md` with a short name and description in YAML frontmatter. Write the entire file yourself, without asking AI to draft or edit it. The instruction body after the closing `---` of the frontmatter must be **no more than 50 lines**, including blank lines. Keep the skill independent of any particular dataset, variable names, or observed results, and load it only when you explicitly invoke it.
+
+Your skill should direct the agent to:
+
+1. judge whether the data are suitable for an SVM analysis;
+2. choose which kernels to consider and explain why;
+3. identify tuning parameters and a method for tuning them;
+4. choose an evaluation method that supports selecting a final model;
+5. require a compact figure and table that justify the choices;
+6. interpret the fit and report the key numerical results; and
+7. prioritize the evidence needed to justify the final model in **no more than one printed page at 11-point font**.
+
+**Apply the skill.** Explicitly invoke your skill to analyze `saheart.csv`, using the same response, nine predictors, and `famhist` coding as in Question 1. Provide these data details when invoking the skill, not in the skill itself. Let the skill guide the analysis, then check the resulting report and calculations.
+
+**Submit the results.** Include the one-page, 11-point analysis report in your Homework 09 submission and append the complete contents of your `SKILL.md` afterward. The appended skill is outside the one-page limit.
